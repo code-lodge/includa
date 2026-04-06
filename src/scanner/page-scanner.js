@@ -51,10 +51,25 @@ async function runFocusOrderCheck(page) {
   return { firstFocusableElements: labels }
 }
 
+async function disableCache(page) {
+  const client = await page.context().newCDPSession(page)
+  await client.send("Network.setCacheDisabled", { cacheDisabled: true })
+  await client.detach()
+}
+
+const STABILIZATION_DELAY_MS = 500
+
 async function scanSinglePage(page, url, options) {
   const start = Date.now()
-  await page.goto(url, { waitUntil: "domcontentloaded", timeout: options.timeout })
-  await page.waitForLoadState("networkidle", { timeout: Math.min(options.timeout, 7000) }).catch(() => {})
+  await disableCache(page)
+  await page.goto(url, { waitUntil: "load", timeout: options.timeout })
+
+  let networkSettled = true
+  await page.waitForLoadState("networkidle", { timeout: Math.min(options.timeout, 7000) })
+    .catch(() => { networkSettled = false })
+
+  // Allow async rendering (JS frameworks, lazy hydration) to stabilise
+  await page.waitForTimeout(STABILIZATION_DELAY_MS)
 
   const [title, axeResults] = await Promise.all([
     page.title(),
@@ -79,6 +94,7 @@ async function scanSinglePage(page, url, options) {
     status: "ok",
     scannedAt: new Date().toISOString(),
     durationMs: Date.now() - start,
+    networkSettled,
     violations,
     passes,
     incomplete,

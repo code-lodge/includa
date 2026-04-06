@@ -11,7 +11,7 @@ export class BrowserPool {
   async init() {
     this.browser = await chromium.launch({ headless: this.headless })
     for (let i = 0; i < this.concurrency; i += 1) {
-      const context = await this.browser.newContext()
+      const context = await this.browser.newContext({ serviceWorkers: "block" })
       this.contexts.push(context)
     }
   }

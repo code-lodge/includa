@@ -168,11 +168,13 @@ export async function sampleByStructure(urls, perTemplate, _options, logger) {
   // Step 3: pick URLs per group
   const sampled = []
   for (const [pattern, groupUrls] of groups) {
+    // Sort within each group for deterministic selection when slicing
+    const sorted = [...groupUrls].sort()
     if (shopify && !pattern.endsWith("/*")) {
       // Unique template — keep all (pages, blog listings, homepage, etc.)
-      sampled.push(...groupUrls)
+      sampled.push(...sorted)
     } else {
-      sampled.push(...groupUrls.slice(0, perTemplate))
+      sampled.push(...sorted.slice(0, perTemplate))
     }
   }
 

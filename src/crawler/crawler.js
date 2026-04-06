@@ -83,7 +83,8 @@ async function crawlByLinks(baseUrl, options, robotsRules, logger) {
     await browser.close().catch(() => {})
   }
 
-  return output
+  // Sort for deterministic ordering regardless of which worker finished first
+  return output.sort()
 }
 
 async function resolveBaseUrl(url, logger) {

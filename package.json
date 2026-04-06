@@ -34,12 +34,11 @@
     "a11y-scan": "./bin/a11y-scan.js"
   },
   "scripts": {
-    "scan": "node ./bin/a11y-scan.js",
-    "dashboard:dev": "npm --prefix dashboard run dev",
-    "dashboard:build": "npm --prefix dashboard run build"
+    "scan": "node ./bin/a11y-scan.js"
   },
   "dependencies": {
     "@axe-core/playwright": "^4.8.0",
+    "axe-core": "^4.11.2",
     "chalk": "^5.3.0",
     "commander": "^11.0.0",
     "playwright": "^1.43.0",

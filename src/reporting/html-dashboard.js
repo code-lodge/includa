@@ -520,6 +520,15 @@ const DASHBOARD_HTML = `<!doctype html>
           <tbody id="ruleRows"></tbody>
         </table>
       </article>
+      <article class="panel span-2">
+        <h2>Pages Scanned</h2>
+        <p class="muted" style="margin:0 0 0.5rem;font-size:0.82rem">All pages included in this scan. Pages marked with <strong>*</strong> did not reach network-idle.</p>
+        <input id="overviewPageSearch" placeholder="Filter by URL" style="margin-bottom:0.5rem" />
+        <table>
+          <thead><tr><th>URL</th><th>Template</th><th>Status</th><th>Violations</th><th>Passes</th><th>Incomplete</th></tr></thead>
+          <tbody id="overviewPageRows"></tbody>
+        </table>
+      </article>
     </section>
 
     <section id="view-violations" role="tabpanel" class="view">
@@ -1033,6 +1042,24 @@ const DASHBOARD_HTML = `<!doctype html>
           (data.topRules || []).map(rule => '<tr><td>' + escapeHtml(rule.id) + '</td><td>' + rule.count + '</td></tr>').join(''),
           'No rules yet')
 
+        const overviewPageSearch = document.getElementById('overviewPageSearch')
+        const overviewQ = (overviewPageSearch && overviewPageSearch.value || '').toLowerCase()
+        const overviewPages = (data.pageIndex || [])
+          .filter(p => !overviewQ || p.url.toLowerCase().includes(overviewQ))
+          .sort((a, b) => a.url.localeCompare(b.url))
+        const settled = (p) => p.networkSettled === false ? ' <span class="muted" title="networkidle not reached">*</span>' : ''
+        const statusBadge = (p) => p.status === 'error'
+          ? '<span class="badge badge-critical">error</span>'
+          : (p.violations || 0) > 0
+            ? '<span class="badge badge-serious">' + (p.violations || 0) + ' violations</span>'
+            : '<span class="badge" style="background:rgba(34,197,94,0.2);color:#86efac">clean</span>'
+        setRows(document.getElementById('overviewPageRows'),
+          overviewPages.map(p =>
+            '<tr><td>' + escapeHtml(p.url) + settled(p) + '</td><td>' + escapeHtml(p.template || '') +
+            '</td><td>' + statusBadge(p) + '</td><td>' + (p.violations || 0) + '</td><td>' + (p.passes || 0) +
+            '</td><td>' + (p.incomplete || 0) + '</td></tr>'
+          ).join(''), 'No pages scanned yet', 6)
+
         // wire all four explorer tabs
         wireExplorer({ selectId:'ruleSelect', searchId:'rulePageSearch', pageSelectId:'rulePageSelect', viewBtnId:'rulePageView', detailBoxId:'ruleDetails', stateKey:'rule', resultKey:'violations', catalog: data.ruleCatalog || [] })
         wireExplorer({ selectId:'passRuleSelect', searchId:'passRulePageSearch', pageSelectId:'passRulePageSelect', viewBtnId:'passRulePageView', detailBoxId:'passRuleDetails', stateKey:'pass', resultKey:'passes', catalog: data.passesRuleCatalog || [] })
@@ -1053,12 +1080,13 @@ const DASHBOARD_HTML = `<!doctype html>
           .slice(-500).reverse()
 
         setRows(document.getElementById('pageRows'),
-          filteredPages.map(page =>
-            '<tr><td>' + escapeHtml(page.url) + '</td><td>' + escapeHtml(page.template) +
+          filteredPages.map(page => {
+            const nw = page.networkSettled === false ? ' <span class="muted" title="networkidle not reached">*</span>' : ''
+            return '<tr><td>' + escapeHtml(page.url) + nw + '</td><td>' + escapeHtml(page.template) +
             '</td><td>' + (page.violations || 0) + '</td><td>' + (page.passes || 0) +
             '</td><td>' + (page.incomplete || 0) + '</td><td>' + (page.inapplicable || 0) +
             '</td><td><button class="ghost" data-detail="' + escapeHtml(page.detailPath) + '">View</button></td></tr>'
-          ).join(''), 'No pages scanned yet', 7)
+          }).join(''), 'No pages scanned yet', 7)
 
         for (const btn of document.querySelectorAll('[data-detail]')) {
           btn.addEventListener('click', () => showPageDetails(btn.getAttribute('data-detail')))
@@ -1092,6 +1120,7 @@ const DASHBOARD_HTML = `<!doctype html>
     refresh()
     document.getElementById('pageSearch').addEventListener('input', refresh)
     document.getElementById('templateFilter').addEventListener('change', refresh)
+    document.getElementById('overviewPageSearch').addEventListener('input', refresh)
     pollTimer = setInterval(refresh, 1500)
   </script>
 </body>

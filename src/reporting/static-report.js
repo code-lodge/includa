@@ -127,6 +127,30 @@ export async function writeStaticReport(reportDir, payload) {
     </tr>`
   }).join("")
 
+  const allPagesSorted = [...pages].sort((a, b) => a.url.localeCompare(b.url))
+  const allPagesTableRows = allPagesSorted.map((page) => {
+    const violationCount = (page.violations || []).reduce((s, v) => s + Math.max(1, v.nodes.length), 0)
+    const passCount = (page.passes || []).length
+    const incompleteCount = (page.incomplete || []).length
+    const link = `<a href="./${escapeHtml(pagePath(page))}">${escapeHtml(page.url)}</a>`
+    const status = page.status === "error"
+      ? '<span class="badge badge-critical">error</span>'
+      : violationCount > 0
+        ? '<span class="badge badge-serious">' + violationCount + ' violations</span>'
+        : '<span class="badge" style="background:rgba(34,197,94,0.2);color:#86efac">clean</span>'
+    const settled = page.networkSettled === false
+      ? ' <span class="muted" title="networkidle was not reached — results may be incomplete">*</span>'
+      : ""
+    return `<tr>
+      <td>${link}${settled}</td>
+      <td>${escapeHtml(page.template || "–")}</td>
+      <td>${status}</td>
+      <td class="num">${violationCount}</td>
+      <td class="num">${passCount}</td>
+      <td class="num">${incompleteCount}</td>
+    </tr>`
+  }).join("")
+
   const html = `<!doctype html>
 <html lang="en">
 <head>
@@ -367,7 +391,7 @@ export async function writeStaticReport(reportDir, payload) {
 
     .muted { color: var(--muted); }
 
-    #pageSearch {
+    #pageSearch, #allPageSearch {
       padding: 0.4rem 0.6rem;
       border-radius: 8px;
       border: 1px solid var(--stroke);
@@ -502,6 +526,27 @@ export async function writeStaticReport(reportDir, payload) {
         </tbody>
       </table>
     </div>` : '<div class="panel-full"><p class="empty">No pages with violations found.</p></div>'}
+
+    <div class="panel-full">
+      <h2>All Pages Scanned (${pages.length})</h2>
+      <p class="muted" style="margin:0 0 0.6rem;font-size:0.82rem">Every page that was scanned, including clean pages. Pages marked with <strong>*</strong> did not reach network-idle and results may be incomplete.</p>
+      <input id="allPageSearch" type="search" placeholder="Filter by URL…" aria-label="Filter all scanned pages by URL" />
+      <table>
+        <thead>
+          <tr>
+            <th>URL</th>
+            <th>Template</th>
+            <th>Status</th>
+            <th class="num">Violations</th>
+            <th class="num">Passes</th>
+            <th class="num">Incomplete</th>
+          </tr>
+        </thead>
+        <tbody id="allPageBody">
+          ${allPagesTableRows}
+        </tbody>
+      </table>
+    </div>
   </div>
 
   <script>
@@ -511,6 +556,17 @@ export async function writeStaticReport(reportDir, payload) {
       search.addEventListener('input', () => {
         const q = search.value.toLowerCase()
         for (const row of rows) {
+          const url = row.querySelector('td')?.textContent?.toLowerCase() || ''
+          row.hidden = q.length > 0 && !url.includes(q)
+        }
+      })
+    }
+    const allSearch = document.getElementById('allPageSearch')
+    const allRows = document.querySelectorAll('#allPageBody tr')
+    if (allSearch) {
+      allSearch.addEventListener('input', () => {
+        const q = allSearch.value.toLowerCase()
+        for (const row of allRows) {
           const url = row.querySelector('td')?.textContent?.toLowerCase() || ''
           row.hidden = q.length > 0 && !url.includes(q)
         }

@@ -331,6 +331,7 @@ export async function createLiveStateTracker(reportDir, targetUrl) {
         title: pageResult.title,
         template,
         status: pageResult.status,
+        networkSettled: pageResult.networkSettled !== false,
         violations: pageViolationCount,
         passes: pagePassCount,
         incomplete: pageIncompleteCount,
