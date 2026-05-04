@@ -402,6 +402,62 @@ const DASHBOARD_HTML = `<!doctype html>
       padding: 0.12rem 0.35rem;
     }
 
+    .sort-controls {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.4rem;
+      align-items: center;
+      margin-bottom: 0.5rem;
+    }
+
+    .sort-controls label {
+      font-size: 0.78rem;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      margin-right: 0.1rem;
+    }
+
+    .sort-btn {
+      min-height: 28px;
+      padding: 0.22rem 0.52rem;
+      font-size: 0.78rem;
+      font-weight: 600;
+      border-radius: 6px;
+      border: 1px solid var(--stroke);
+      background: rgba(5, 17, 27, 0.82);
+      color: var(--muted);
+      cursor: pointer;
+      transition: background 120ms ease, color 120ms ease, border-color 120ms ease;
+    }
+
+    .sort-btn:hover { color: var(--text); }
+
+    .sort-btn.active {
+      background: linear-gradient(90deg, rgba(45, 212, 191, 0.18), rgba(56, 189, 248, 0.18));
+      border-color: rgba(45, 212, 191, 0.45);
+      color: #f0fdfa;
+    }
+
+    .sort-btn .arrow { font-size: 0.68rem; margin-left: 0.2rem; }
+
+    .virtual-scroll-container {
+      max-height: 520px;
+      overflow-y: auto;
+      position: relative;
+    }
+
+    .virtual-scroll-container table {
+      position: relative;
+    }
+
+    .virtual-scroll-container thead {
+      position: sticky;
+      top: 0;
+      z-index: 1;
+      background: var(--panel-strong);
+    }
+
     @media (max-width: 1200px) {
       .view.active { grid-template-columns: 1fr; }
       .span-2 { grid-column: span 1; }
@@ -476,7 +532,8 @@ const DASHBOARD_HTML = `<!doctype html>
     </details>
 
     <section class="top-grid">
-      <article class="stat"><div class="label">WCAG Level</div><div id="wcagLevel" class="value">AAA</div></article>
+      <article class="stat"><div class="label">WCAG Level (Scanned)</div><div id="wcagLevel" class="value">AAA</div></article>
+      <article class="stat"><div class="label">Compliance Achieved</div><div id="complianceLevel" class="value">–</div></article>
       <article class="stat"><div class="label">Discovered Pages</div><div id="discoveredPages" class="value">0</div></article>
       <article class="stat"><div class="label">Scanned Pages</div><div id="scannedPages" class="value">0</div></article>
       <article class="stat"><div class="label">Violations</div><div id="totalViolations" class="value" style="color: var(--critical)">0</div></article>
@@ -524,10 +581,19 @@ const DASHBOARD_HTML = `<!doctype html>
         <h2>Pages Scanned</h2>
         <p class="muted" style="margin:0 0 0.5rem;font-size:0.82rem">All pages included in this scan. Pages marked with <strong>*</strong> did not reach network-idle.</p>
         <input id="overviewPageSearch" placeholder="Filter by URL" style="margin-bottom:0.5rem" />
-        <table>
-          <thead><tr><th>URL</th><th>Template</th><th>Status</th><th>Violations</th><th>Passes</th><th>Incomplete</th></tr></thead>
-          <tbody id="overviewPageRows"></tbody>
-        </table>
+        <div class="sort-controls">
+          <label>Sort by:</label>
+          <button class="sort-btn active" type="button" data-sort-target="overview" data-sort-key="url" data-sort-dir="asc">URL <span class="arrow">▲</span></button>
+          <button class="sort-btn" type="button" data-sort-target="overview" data-sort-key="violations" data-sort-dir="desc">Violations</button>
+          <button class="sort-btn" type="button" data-sort-target="overview" data-sort-key="passes" data-sort-dir="desc">Passes</button>
+          <button class="sort-btn" type="button" data-sort-target="overview" data-sort-key="incomplete" data-sort-dir="desc">Incomplete</button>
+        </div>
+        <div id="overviewVirtualScroll" class="virtual-scroll-container">
+          <table>
+            <thead><tr><th>URL</th><th>Template</th><th>Status</th><th>Violations</th><th>Passes</th><th>Incomplete</th></tr></thead>
+            <tbody id="overviewPageRows"></tbody>
+          </table>
+        </div>
       </article>
     </section>
 
@@ -614,10 +680,20 @@ const DASHBOARD_HTML = `<!doctype html>
           <input id="pageSearch" placeholder="Filter by URL" />
           <select id="templateFilter"><option value="">All templates</option></select>
         </div>
-        <table>
-          <thead><tr><th>URL</th><th>Template</th><th>Violations</th><th>Passes</th><th>Incomplete</th><th>Inapplicable</th><th>Details</th></tr></thead>
-          <tbody id="pageRows"></tbody>
-        </table>
+        <div class="sort-controls">
+          <label>Sort by:</label>
+          <button class="sort-btn active" type="button" data-sort-target="pages" data-sort-key="url" data-sort-dir="asc">URL <span class="arrow">▲</span></button>
+          <button class="sort-btn" type="button" data-sort-target="pages" data-sort-key="violations" data-sort-dir="desc">Violations</button>
+          <button class="sort-btn" type="button" data-sort-target="pages" data-sort-key="passes" data-sort-dir="desc">Passes</button>
+          <button class="sort-btn" type="button" data-sort-target="pages" data-sort-key="incomplete" data-sort-dir="desc">Incomplete</button>
+          <button class="sort-btn" type="button" data-sort-target="pages" data-sort-key="inapplicable" data-sort-dir="desc">Inapplicable</button>
+        </div>
+        <div id="pagesVirtualScroll" class="virtual-scroll-container">
+          <table>
+            <thead><tr><th>URL</th><th>Template</th><th>Violations</th><th>Passes</th><th>Incomplete</th><th>Inapplicable</th><th>Details</th></tr></thead>
+            <tbody id="pageRows"></tbody>
+          </table>
+        </div>
       </article>
       <article class="panel">
         <h2>Selected Page Details</h2>
@@ -641,6 +717,90 @@ const DASHBOARD_HTML = `<!doctype html>
   </div>
 
   <script>
+    // --- sort state ---
+    const sortState = {
+      overview: { key: 'url', dir: 'asc' },
+      pages:    { key: 'url', dir: 'asc' }
+    }
+
+    function sortPages(pages, key, dir) {
+      return pages.slice().sort((a, b) => {
+        if (key === 'url') {
+          const cmp = a.url.localeCompare(b.url)
+          return dir === 'asc' ? cmp : -cmp
+        }
+        const av = a[key] || 0, bv = b[key] || 0
+        return dir === 'desc' ? bv - av : av - bv
+      })
+    }
+
+    // --- virtual scroll ---
+    const ROW_HEIGHT = 34
+    const BUFFER_ROWS = 20
+
+    function createVirtualizer(containerId, tbodyId, renderRow, colCount) {
+      const container = document.getElementById(containerId)
+      const tbody = document.getElementById(tbodyId)
+      let allData = []
+      let lastStart = -1, lastEnd = -1
+
+      function render() {
+        if (allData.length === 0) {
+          tbody.innerHTML = '<tr><td class="muted" colspan="' + colCount + '">No pages scanned yet</td></tr>'
+          lastStart = -1; lastEnd = -1
+          return
+        }
+        const scrollTop = container.scrollTop
+        const viewportHeight = container.clientHeight
+        let start = Math.floor(scrollTop / ROW_HEIGHT) - BUFFER_ROWS
+        let end = Math.ceil((scrollTop + viewportHeight) / ROW_HEIGHT) + BUFFER_ROWS
+        start = Math.max(0, start)
+        end = Math.min(allData.length, end)
+        if (start === lastStart && end === lastEnd) return
+        lastStart = start; lastEnd = end
+        const topH = start * ROW_HEIGHT
+        const bottomH = (allData.length - end) * ROW_HEIGHT
+        const rows = ['<tr aria-hidden="true"><td colspan="' + colCount + '" style="height:' + topH + 'px;padding:0;border:0"></td></tr>']
+        for (let i = start; i < end; i++) rows.push(renderRow(allData[i], i))
+        rows.push('<tr aria-hidden="true"><td colspan="' + colCount + '" style="height:' + bottomH + 'px;padding:0;border:0"></td></tr>')
+        tbody.innerHTML = rows.join('')
+      }
+
+      container.addEventListener('scroll', render, { passive: true })
+
+      return {
+        setData(data) {
+          allData = data
+          lastStart = -1; lastEnd = -1
+          render()
+        },
+        refresh: render
+      }
+    }
+
+    // --- sort button wiring ---
+    for (const btn of document.querySelectorAll('.sort-btn[data-sort-target]')) {
+      btn.addEventListener('click', () => {
+        const target = btn.dataset.sortTarget
+        const key = btn.dataset.sortKey
+        const state = sortState[target]
+        if (state.key === key) {
+          state.dir = state.dir === 'desc' ? 'asc' : 'desc'
+        } else {
+          state.key = key
+          state.dir = btn.dataset.sortDir || 'desc'
+        }
+        for (const b of document.querySelectorAll('.sort-btn[data-sort-target="' + target + '"]')) {
+          b.classList.remove('active')
+          const arrow = b.querySelector('.arrow')
+          if (arrow) arrow.remove()
+        }
+        btn.classList.add('active')
+        btn.insertAdjacentHTML('beforeend', ' <span class="arrow">' + (state.dir === 'asc' ? '▲' : '▼') + '</span>')
+        refresh()
+      })
+    }
+
     // --- explorer state per tab ---
     const explorerState = {
       rule:         { ruleFile: '__all__', ruleId: '', cache: null },
@@ -795,6 +955,18 @@ const DASHBOARD_HTML = `<!doctype html>
       return String(value || '')
         .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
         .replace(/"/g, '&quot;').replace(/'/g, '&#39;')
+    }
+
+    function settled(p) {
+      return p.networkSettled === false ? ' <span class="muted" title="networkidle not reached">*</span>' : ''
+    }
+
+    function statusBadge(p) {
+      return p.status === 'error'
+        ? '<span class="badge badge-critical">error</span>'
+        : (p.violations || 0) > 0
+          ? '<span class="badge badge-serious">' + (p.violations || 0) + ' violations</span>'
+          : '<span class="badge" style="background:rgba(34,197,94,0.2);color:#86efac">clean</span>'
     }
 
     // --- page details panel ---
@@ -1016,6 +1188,12 @@ const DASHBOARD_HTML = `<!doctype html>
 
         document.getElementById('scanStatus').textContent = data.statusMessage || 'Running'
         document.getElementById('wcagLevel').textContent = data.wcagLevel || 'AAA'
+        const wv = data.wcagViolations || {}
+        const COMPLIANCE_COLOR = { AAA: '#22c55e', AA: '#22c55e', A: '#fb923c', None: '#ef4444' }
+        const complianceLevel = wv.a > 0 ? 'None' : wv.aa > 0 ? 'A' : wv.aaa > 0 ? 'AA' : 'AAA'
+        const complianceEl = document.getElementById('complianceLevel')
+        complianceEl.textContent = 'WCAG ' + complianceLevel
+        complianceEl.style.color = COMPLIANCE_COLOR[complianceLevel] || ''
         document.getElementById('discoveredPages').textContent = data.discoveredPages || 0
         document.getElementById('scannedPages').textContent = data.scannedPages || 0
         document.getElementById('totalViolations').textContent = data.totalViolations || 0
@@ -1044,21 +1222,10 @@ const DASHBOARD_HTML = `<!doctype html>
 
         const overviewPageSearch = document.getElementById('overviewPageSearch')
         const overviewQ = (overviewPageSearch && overviewPageSearch.value || '').toLowerCase()
-        const overviewPages = (data.pageIndex || [])
+        const overviewFiltered = (data.pageIndex || [])
           .filter(p => !overviewQ || p.url.toLowerCase().includes(overviewQ))
-          .sort((a, b) => a.url.localeCompare(b.url))
-        const settled = (p) => p.networkSettled === false ? ' <span class="muted" title="networkidle not reached">*</span>' : ''
-        const statusBadge = (p) => p.status === 'error'
-          ? '<span class="badge badge-critical">error</span>'
-          : (p.violations || 0) > 0
-            ? '<span class="badge badge-serious">' + (p.violations || 0) + ' violations</span>'
-            : '<span class="badge" style="background:rgba(34,197,94,0.2);color:#86efac">clean</span>'
-        setRows(document.getElementById('overviewPageRows'),
-          overviewPages.map(p =>
-            '<tr><td>' + escapeHtml(p.url) + settled(p) + '</td><td>' + escapeHtml(p.template || '') +
-            '</td><td>' + statusBadge(p) + '</td><td>' + (p.violations || 0) + '</td><td>' + (p.passes || 0) +
-            '</td><td>' + (p.incomplete || 0) + '</td></tr>'
-          ).join(''), 'No pages scanned yet', 6)
+        const overviewSorted = sortPages(overviewFiltered, sortState.overview.key, sortState.overview.dir)
+        overviewVirtualizer.setData(overviewSorted)
 
         // wire all four explorer tabs
         wireExplorer({ selectId:'ruleSelect', searchId:'rulePageSearch', pageSelectId:'rulePageSelect', viewBtnId:'rulePageView', detailBoxId:'ruleDetails', stateKey:'rule', resultKey:'violations', catalog: data.ruleCatalog || [] })
@@ -1077,20 +1244,8 @@ const DASHBOARD_HTML = `<!doctype html>
         const filteredPages = (data.pageIndex || [])
           .filter(p => (!templateFilter.value || p.template === templateFilter.value) &&
             (!pageSearch.value || p.url.toLowerCase().includes(pageSearch.value.toLowerCase())))
-          .slice(-500).reverse()
-
-        setRows(document.getElementById('pageRows'),
-          filteredPages.map(page => {
-            const nw = page.networkSettled === false ? ' <span class="muted" title="networkidle not reached">*</span>' : ''
-            return '<tr><td>' + escapeHtml(page.url) + nw + '</td><td>' + escapeHtml(page.template) +
-            '</td><td>' + (page.violations || 0) + '</td><td>' + (page.passes || 0) +
-            '</td><td>' + (page.incomplete || 0) + '</td><td>' + (page.inapplicable || 0) +
-            '</td><td><button class="ghost" data-detail="' + escapeHtml(page.detailPath) + '">View</button></td></tr>'
-          }).join(''), 'No pages scanned yet', 7)
-
-        for (const btn of document.querySelectorAll('[data-detail]')) {
-          btn.addEventListener('click', () => showPageDetails(btn.getAttribute('data-detail')))
-        }
+        const pagesSorted = sortPages(filteredPages, sortState.pages.key, sortState.pages.dir)
+        pagesVirtualizer.setData(pagesSorted)
 
         setRows(document.getElementById('logRows'),
           (data.logs || []).map(log =>
@@ -1116,6 +1271,25 @@ const DASHBOARD_HTML = `<!doctype html>
     }
 
     let pollTimer = null
+
+    const overviewVirtualizer = createVirtualizer('overviewVirtualScroll', 'overviewPageRows', (p) => {
+      return '<tr><td>' + escapeHtml(p.url) + settled(p) + '</td><td>' + escapeHtml(p.template || '') +
+        '</td><td>' + statusBadge(p) + '</td><td>' + (p.violations || 0) + '</td><td>' + (p.passes || 0) +
+        '</td><td>' + (p.incomplete || 0) + '</td></tr>'
+    }, 6)
+
+    const pagesVirtualizer = createVirtualizer('pagesVirtualScroll', 'pageRows', (page) => {
+      const nw = page.networkSettled === false ? ' <span class="muted" title="networkidle not reached">*</span>' : ''
+      return '<tr><td>' + escapeHtml(page.url) + nw + '</td><td>' + escapeHtml(page.template) +
+        '</td><td>' + (page.violations || 0) + '</td><td>' + (page.passes || 0) +
+        '</td><td>' + (page.incomplete || 0) + '</td><td>' + (page.inapplicable || 0) +
+        '</td><td><button class="ghost" data-detail="' + escapeHtml(page.detailPath) + '">View</button></td></tr>'
+    }, 7)
+
+    document.getElementById('pagesVirtualScroll').addEventListener('click', (e) => {
+      const btn = e.target.closest('[data-detail]')
+      if (btn) showPageDetails(btn.getAttribute('data-detail'))
+    })
 
     refresh()
     document.getElementById('pageSearch').addEventListener('input', refresh)
