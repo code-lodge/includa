@@ -3,6 +3,8 @@ import http from "node:http"
 import path from "node:path"
 import { runScan } from "../index.js"
 import { writeDashboard } from "./html-dashboard.js"
+import { ProjectStore } from "../store/project-store.js"
+import { renderProjectsHome } from "./projects-home.js"
 
 /**
  * Walk a JSON fragment and find the closing bracket/brace that matches the
@@ -28,7 +30,7 @@ function extractJsonValue(text, key) {
   for (let i = start; i < text.length; i++) {
     const ch = text[i]
     if (inString) {
-      if (ch === "\\") { i++ } // skip escaped char
+      if (ch === "\\") { i++ }
       else if (ch === '"') inString = false
     } else {
       if (ch === '"') inString = true
@@ -44,33 +46,19 @@ function extractJsonValue(text, key) {
   return null
 }
 
-/**
- * Read and parse resume-state.json.  If the file is too large or corrupt
- * (e.g. an old format that stored full axe results), fall back to a partial
- * read of the first 4 MB which always contains targetUrl, options, and the
- * remaining[] URL list (these appear before the massive completedResults
- * array in the old format).  On successful recovery the corrupt file is
- * replaced with a clean slim version so the next resume works normally.
- */
 async function readResumeState(resumePath) {
-  // Fast path: normal parse (works for every new slim-format file)
   try {
     const raw = await fs.readFile(resumePath, "utf8")
     return JSON.parse(raw)
-  } catch {
-    // Fall through to partial-read recovery
-  }
+  } catch { /* fall through */ }
 
   let fd
   try {
     fd = await fs.open(resumePath, "r")
-    // 4 MB is enough to capture targetUrl, options, and the remaining[] array
-    // even for very large sites (12 000 URLs × ~60 chars ≈ 720 KB).
     const buf = Buffer.alloc(4 * 1024 * 1024)
     const { bytesRead } = await fd.read(buf, 0, buf.length, 0)
     const partial = buf.subarray(0, bytesRead).toString("utf8")
 
-    // Pull targetUrl — a plain string value
     const urlMatch = partial.match(/"targetUrl"\s*:\s*"((?:[^"\\]|\\.)*)"/)
     if (!urlMatch) return null
     const targetUrl = JSON.parse(`"${urlMatch[1]}"`)
@@ -79,11 +67,7 @@ async function readResumeState(resumePath) {
     if (!options) return null
 
     const remaining = extractJsonValue(partial, '"remaining"') ?? []
-    const completedUrls = extractJsonValue(partial, '"completedUrls"') ?? []
-
-    // Overwrite the corrupt/oversized file with a clean slim version so
-    // subsequent resume attempts (and index.js loadResumeState) work normally.
-    const slim = { targetUrl, options, allUrls: [], remaining, completedUrls }
+    const slim = { targetUrl, options, allUrls: [], remaining }
     await fs.writeFile(resumePath, JSON.stringify(slim, null, 2), "utf8")
     console.log(`[resume] Recovered corrupt resume-state.json — ${remaining.length} pages remaining`)
     return slim
@@ -134,186 +118,304 @@ function sendJson(res, status, payload) {
   res.end(JSON.stringify(payload))
 }
 
-export async function serveDashboard({ reportDir, port, defaultOptions = {}, initialUrl = null }) {
-  let root = path.resolve(reportDir)
-  let scanRunning = false
-  let scanAbort = null // AbortController for current scan
-  let lastScanUrl = null
-  let lastScanOverrides = null
+function sendHtml(res, html) {
+  res.writeHead(200, { "content-type": "text/html; charset=utf-8", "cache-control": "no-store" })
+  res.end(html)
+}
 
-  // Always write fresh dashboard HTML so stale generated files never cause JS errors
-  await writeDashboard(root)
+function resumeMetaPath(scanDir) {
+  return path.join(scanDir, "raw", "resume-state.json")
+}
 
-  function buildScanOptions(overrides = {}) {
-    const wcagLevel = WCAG_LEVELS.has(overrides.wcagLevel) ? overrides.wcagLevel : (defaultOptions.wcagLevel || "AAA")
+export async function serveDashboard({ dataDir, port, defaultOptions = {}, initialUrl = null }) {
+  const store = new ProjectStore(path.resolve(dataDir))
+  await fs.mkdir(path.resolve(dataDir), { recursive: true })
+
+  // Per-project scan state: projectId → { scanRunning, scanAbort, currentScanDir }
+  const scanState = new Map()
+
+  function getState(projectId) {
+    if (!scanState.has(projectId)) {
+      scanState.set(projectId, { scanRunning: false, scanAbort: null, currentScanDir: null })
+    }
+    return scanState.get(projectId)
+  }
+
+  function buildScanOptions(project, overrides = {}) {
+    const merged = { ...defaultOptions, ...(project.options || {}), ...overrides }
+    const wcagLevel = WCAG_LEVELS.has(merged.wcagLevel) ? merged.wcagLevel : "AAA"
     return {
-      format: defaultOptions.format || "html,json,csv",
-      locale: defaultOptions.locale || "en",
+      format: merged.format || "html,json,csv",
+      locale: merged.locale || "en",
       wcagLevel,
-      maxPages: Number(overrides.maxPages ?? defaultOptions.maxPages ?? 2000),
-      concurrency: Number(overrides.concurrency ?? defaultOptions.concurrency ?? 10),
-      depth: Number(overrides.depth ?? defaultOptions.depth ?? 6),
-      sampleTemplates: Number(overrides.sampleTemplates ?? defaultOptions.sampleTemplates ?? 0),
-      timeout: Number(defaultOptions.timeout ?? 30000),
-      headless: defaultOptions.headless ?? true,
-      include: overrides.include?.length ? overrides.include : (defaultOptions.include || []),
-      exclude: overrides.exclude?.length ? overrides.exclude : (defaultOptions.exclude || []),
-      sitemap: defaultOptions.sitemap || null,
-      checkKeyboard: defaultOptions.checkKeyboard ?? true,
-      checkAria: defaultOptions.checkAria ?? true,
-      checkFocusOrder: defaultOptions.checkFocusOrder ?? true,
-      contrastScreenshots: defaultOptions.contrastScreenshots ?? false,
-      elementScreenshots: defaultOptions.elementScreenshots ?? true,
+      maxPages: Number(merged.maxPages ?? 2000),
+      concurrency: Number(merged.concurrency ?? 10),
+      depth: Number(merged.depth ?? 6),
+      sampleTemplates: Number(merged.sampleTemplates ?? 0),
+      timeout: Number(merged.timeout ?? 30000),
+      headless: merged.headless ?? true,
+      include: merged.include?.length ? merged.include : [],
+      exclude: merged.exclude?.length ? merged.exclude : [],
+      sitemap: merged.sitemap || null,
+      checkKeyboard: merged.checkKeyboard ?? true,
+      checkAria: merged.checkAria ?? true,
+      checkFocusOrder: merged.checkFocusOrder ?? true,
+      contrastScreenshots: merged.contrastScreenshots ?? false,
+      elementScreenshots: merged.elementScreenshots ?? true,
       failOnCritical: false,
       failOnSerious: false,
-      reportDir: root
+      projectId: project.id,
+      projectUrl: project.url,
+      reportDir: store.scanDir(project.id)
     }
   }
 
-  async function startScan(url, overrides = {}) {
-    const scanOptions = buildScanOptions(overrides)
-    scanAbort = new AbortController()
-    lastScanUrl = url
-    lastScanOverrides = overrides
+  async function startProjectScan(project, overrides = {}) {
+    const state = getState(project.id)
+    const scanOptions = buildScanOptions(project, overrides)
+    const scanDir = scanOptions.reportDir
 
-    scanRunning = true
-    runScan(url, scanOptions, scanAbort.signal)
-      .catch((err) => {
-        console.log(`\nScan failed: ${err.message}`)
+    await fs.mkdir(scanDir, { recursive: true })
+    await writeDashboard(scanDir, { projectId: project.id, projectUrl: project.url })
+
+    state.currentScanDir = scanDir
+    state.scanRunning = true
+    state.scanAbort = new AbortController()
+
+    await store.update(project.id, {
+      lastScanAt: new Date().toISOString(),
+      lastScanDir: scanDir,
+      lastScanStatus: "running"
+    })
+
+    runScan(project.url, scanOptions, state.scanAbort.signal)
+      .then(async (result) => {
+        await store.update(project.id, {
+          lastScanStatus: result.stopped ? "stopped" : "completed",
+          lastViolations: result.summary?.totalViolations ?? null,
+          lastPages: result.summary?.scannedPages ?? null,
+          lastScanDir: scanDir
+        })
+      })
+      .catch(async (err) => {
+        console.log(`\n[project:${project.id}] Scan failed: ${err.message}`)
         if (err.stack) console.log(err.stack)
+        await store.update(project.id, { lastScanStatus: "failed" })
       })
       .finally(() => {
-        scanRunning = false
-        scanAbort = null
+        state.scanRunning = false
+        state.scanAbort = null
       })
   }
 
-  function hasResumeState() {
-    const resumePath = path.join(root, "raw", "resume-state.json")
-    return fs.stat(resumePath).then(() => true).catch(() => false)
+  async function hasResumeState(scanDir) {
+    return fs.stat(resumeMetaPath(scanDir)).then(() => true).catch(() => false)
+  }
+
+  function projectStaticRoot(project) {
+    const state = getState(project.id)
+    return (state.scanRunning && state.currentScanDir) ? state.currentScanDir : project.lastScanDir
   }
 
   const server = http.createServer(async (req, res) => {
-    // POST /api/scan — start a new scan
-    if (req.method === "POST" && req.url === "/api/scan") {
-      if (scanRunning) {
-        sendJson(res, 409, { error: "A scan is already running" })
-        return
-      }
+    const url = req.url || "/"
 
+    // --- Home: GET / ---
+    if (req.method === "GET" && (url === "/" || url === "/index.html")) {
+      const projects = await store.list()
+      const augmented = projects.map((p) => ({
+        ...p,
+        scanRunning: getState(p.id).scanRunning
+      }))
+      sendHtml(res, renderProjectsHome(augmented))
+      return
+    }
+
+    // --- GET /api/projects ---
+    if (req.method === "GET" && url.startsWith("/api/projects") && !url.match(/^\/api\/projects\/[^/]/)) {
+      const projects = await store.list()
+      sendJson(res, 200, projects.map((p) => ({
+        ...p,
+        scanRunning: getState(p.id).scanRunning
+      })))
+      return
+    }
+
+    // --- POST /api/projects ---
+    if (req.method === "POST" && url === "/api/projects") {
       try {
-        const raw = await readBody(req)
-        const params = JSON.parse(raw || "{}")
-        const { url, ...overrides } = params
-
-        if (!url || typeof url !== "string") {
-          sendJson(res, 400, { error: "url is required" })
-          return
-        }
-
-        try { new URL(url) } catch {
-          sendJson(res, 400, { error: "Invalid URL" })
-          return
-        }
-
-        await startScan(url, overrides)
-        sendJson(res, 202, { status: "started", url })
-      } catch (err) {
-        sendJson(res, 400, { error: err.message })
-      }
+        const body = JSON.parse(await readBody(req) || "{}")
+        if (!body.name || !body.url) { sendJson(res, 400, { error: "name and url are required" }); return }
+        try { new URL(body.url) } catch { sendJson(res, 400, { error: "Invalid URL" }); return }
+        const project = await store.create({ name: body.name, url: body.url, options: body.options || {} })
+        sendJson(res, 201, project)
+      } catch (err) { sendJson(res, 400, { error: err.message }) }
       return
     }
 
-    // POST /api/scan/stop — stop the running scan
-    if (req.method === "POST" && req.url === "/api/scan/stop") {
-      if (!scanRunning || !scanAbort) {
-        sendJson(res, 400, { error: "No scan is running" })
+    // Match /api/projects/:id and /api/projects/:id/*
+    const projectApiMatch = url.match(/^\/api\/projects\/([^/]+)(\/.*)?$/)
+    if (projectApiMatch) {
+      const projectId = projectApiMatch[1]
+      const sub = projectApiMatch[2] || ""
+      const project = await store.get(projectId)
+
+      // --- PATCH /api/projects/:id ---
+      if (req.method === "PATCH" && sub === "") {
+        if (!project) { sendJson(res, 404, { error: "Project not found" }); return }
+        try {
+          const body = JSON.parse(await readBody(req) || "{}")
+          const updated = await store.update(projectId, { name: body.name, url: body.url })
+          sendJson(res, 200, updated)
+        } catch (err) { sendJson(res, 400, { error: err.message }) }
         return
       }
-      scanAbort.abort()
-      sendJson(res, 200, { status: "stopping" })
+
+      // --- DELETE /api/projects/:id ---
+      if (req.method === "DELETE" && sub === "") {
+        const state = getState(projectId)
+        if (state.scanRunning) { sendJson(res, 409, { error: "Cannot delete project while scan is running" }); return }
+        await store.delete(projectId)
+        sendJson(res, 200, { status: "deleted" })
+        return
+      }
+
+      if (!project) { sendJson(res, 404, { error: "Project not found" }); return }
+      const state = getState(projectId)
+
+      // --- POST /api/projects/:id/scan ---
+      if (req.method === "POST" && sub === "/scan") {
+        if (state.scanRunning) { sendJson(res, 409, { error: "A scan is already running for this project" }); return }
+        try {
+          const body = JSON.parse(await readBody(req) || "{}")
+          await startProjectScan(project, body)
+          sendJson(res, 202, { status: "started", url: project.url })
+        } catch (err) { sendJson(res, 400, { error: err.message }) }
+        return
+      }
+
+      // --- POST /api/projects/:id/scan/stop ---
+      if (req.method === "POST" && sub === "/scan/stop") {
+        if (!state.scanRunning || !state.scanAbort) { sendJson(res, 400, { error: "No scan is running" }); return }
+        state.scanAbort.abort()
+        sendJson(res, 200, { status: "stopping" })
+        return
+      }
+
+      // --- POST /api/projects/:id/scan/resume ---
+      if (req.method === "POST" && sub === "/scan/resume") {
+        if (state.scanRunning) { sendJson(res, 409, { error: "A scan is already running" }); return }
+        const lastDir = project.lastScanDir
+        if (!lastDir || !(await hasResumeState(lastDir))) {
+          sendJson(res, 400, { error: "No stopped scan to resume" }); return
+        }
+        try {
+          const resumeData = await readResumeState(resumeMetaPath(lastDir))
+          if (!resumeData?.targetUrl) { sendJson(res, 400, { error: "Resume state missing or corrupt. Start a new scan." }); return }
+          // Resume re-uses the existing scan dir so live-state and reports update in place
+          const scanOptions = buildScanOptions(project, resumeData.options || {})
+          scanOptions.reportDir = lastDir
+          scanOptions.projectId = project.id
+          scanOptions.projectUrl = project.url
+
+          state.currentScanDir = lastDir
+          state.scanRunning = true
+          state.scanAbort = new AbortController()
+          await store.update(project.id, { lastScanStatus: "running" })
+
+          runScan(project.url, scanOptions, state.scanAbort.signal)
+            .then(async (result) => {
+              await store.update(project.id, {
+                lastScanStatus: result.stopped ? "stopped" : "completed",
+                lastViolations: result.summary?.totalViolations ?? null,
+                lastPages: result.summary?.scannedPages ?? null
+              })
+            })
+            .catch(async (err) => {
+              console.log(`\n[project:${project.id}] Resume failed: ${err.message}`)
+              await store.update(project.id, { lastScanStatus: "failed" })
+            })
+            .finally(() => {
+              state.scanRunning = false
+              state.scanAbort = null
+            })
+
+          sendJson(res, 202, { status: "resumed", url: project.url })
+        } catch (err) { sendJson(res, 400, { error: err.message }) }
+        return
+      }
+
+      // --- GET /api/projects/:id/status ---
+      if (req.method === "GET" && sub === "/status") {
+        const canResume = !state.scanRunning && project.lastScanDir ? await hasResumeState(project.lastScanDir) : false
+        sendJson(res, 200, { scanRunning: state.scanRunning, canResume, projectId })
+        return
+      }
+
+      // --- GET /api/projects/:id/report-dir ---
+      if (req.method === "GET" && sub === "/report-dir") {
+        sendJson(res, 200, { reportDir: project.lastScanDir || "" })
+        return
+      }
+
+      // --- POST /api/projects/:id/report-dir (no-op in project mode — dir is managed by server) ---
+      if (req.method === "POST" && sub === "/report-dir") {
+        sendJson(res, 200, { reportDir: project.lastScanDir || "" })
+        return
+      }
+
+      sendJson(res, 404, { error: "Unknown API route" })
       return
     }
 
-    // POST /api/scan/resume — resume a stopped scan
-    if (req.method === "POST" && req.url === "/api/scan/resume") {
-      if (scanRunning) {
-        sendJson(res, 409, { error: "A scan is already running" })
+    // --- GET /projects/:id → redirect to /projects/:id/ ---
+    const projectPageMatch = url.match(/^\/projects\/([^/]+)(\/.*)?$/)
+    if (projectPageMatch) {
+      const projectId = projectPageMatch[1]
+      const sub = projectPageMatch[2] || "/"
+      const project = await store.get(projectId)
+
+      if (!project) {
+        res.writeHead(404, { "content-type": "text/plain; charset=utf-8" })
+        res.end("Project not found")
         return
       }
 
-      const canResume = await hasResumeState()
-      if (!canResume) {
-        sendJson(res, 400, { error: "No stopped scan to resume" })
+      if (sub === "") {
+        res.writeHead(302, { location: `/projects/${projectId}/` })
+        res.end()
         return
       }
 
+      const staticRoot = projectStaticRoot(project)
+      if (!staticRoot) {
+        sendHtml(res, `<!doctype html><html><body style="font-family:sans-serif;padding:2rem;background:#0f1117;color:#e2e8f0">
+          <h2>No scan results yet</h2>
+          <p>Start a scan from <a href="/" style="color:#7c6af7">All Projects</a> first.</p>
+        </body></html>`)
+        return
+      }
+
+      const filePath = safeResolve(staticRoot, sub)
       try {
-        const resumeData = await readResumeState(path.join(root, "raw", "resume-state.json"))
-        if (!resumeData?.targetUrl) {
-          sendJson(res, 400, { error: "Resume state is missing or could not be recovered. Please start a new scan." })
-          return
-        }
-        await startScan(resumeData.targetUrl, resumeData.options)
-        sendJson(res, 202, { status: "resumed", url: resumeData.targetUrl })
-      } catch (err) {
-        sendJson(res, 400, { error: err.message })
+        const stat = await fs.stat(filePath)
+        const finalPath = stat.isDirectory() ? path.join(filePath, "index.html") : filePath
+        const data = await fs.readFile(finalPath)
+        const ct = contentType(finalPath)
+        const headers = { "content-type": ct }
+        if (ct.startsWith("text/html")) headers["cache-control"] = "no-store"
+        res.writeHead(200, headers)
+        res.end(data)
+      } catch {
+        res.writeHead(404, { "content-type": "text/plain; charset=utf-8" })
+        res.end("Not found")
       }
       return
     }
 
-    // GET /api/status — check scan state
-    if (req.method === "GET" && req.url?.startsWith("/api/status")) {
-      const canResume = !scanRunning && await hasResumeState()
-      sendJson(res, 200, { scanRunning, canResume })
-      return
-    }
-
-    // POST /api/report-dir — change the report output directory
-    if (req.method === "POST" && req.url === "/api/report-dir") {
-      if (scanRunning) {
-        sendJson(res, 409, { error: "Cannot change directory while scan is running" })
-        return
-      }
-      try {
-        const raw = await readBody(req)
-        const { dir } = JSON.parse(raw || "{}")
-        if (!dir || typeof dir !== "string") {
-          sendJson(res, 400, { error: "dir is required" })
-          return
-        }
-        const resolved = path.resolve(dir)
-        await fs.mkdir(resolved, { recursive: true })
-        root = resolved
-        await writeDashboard(root)
-        sendJson(res, 200, { status: "ok", reportDir: resolved })
-      } catch (err) {
-        sendJson(res, 400, { error: err.message })
-      }
-      return
-    }
-
-    // GET /api/report-dir — get the current report directory
-    if (req.method === "GET" && req.url?.startsWith("/api/report-dir")) {
-      sendJson(res, 200, { reportDir: root })
-      return
-    }
-
-    // Static file serving
-    const filePath = safeResolve(root, req.url || "/")
-    try {
-      const stat = await fs.stat(filePath)
-      const finalPath = stat.isDirectory() ? path.join(filePath, "index.html") : filePath
-      const data = await fs.readFile(finalPath)
-      const ct = contentType(finalPath)
-      const headers = { "content-type": ct }
-      if (ct.startsWith("text/html")) headers["cache-control"] = "no-store"
-      res.writeHead(200, headers)
-      res.end(data)
-    } catch {
-      res.writeHead(404, { "content-type": "text/plain; charset=utf-8" })
-      res.end("Not found. Run a scan first to generate dashboard files.")
-    }
+    // 404 for anything else
+    res.writeHead(404, { "content-type": "text/plain; charset=utf-8" })
+    res.end("Not found")
   })
 
   await new Promise((resolve, reject) => {
@@ -326,6 +428,11 @@ export async function serveDashboard({ reportDir, port, defaultOptions = {}, ini
 
   if (initialUrl) {
     console.log(`Starting scan for ${initialUrl}...`)
-    await startScan(initialUrl)
+    let project = (await store.list()).find((p) => p.url === initialUrl)
+    if (!project) {
+      const name = new URL(initialUrl).hostname
+      project = await store.create({ name, url: initialUrl, options: defaultOptions })
+    }
+    await startProjectScan(project)
   }
 }

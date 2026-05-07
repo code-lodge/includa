@@ -55,6 +55,7 @@ program
   .option("--element-screenshots", "capture element-level screenshots for each violation (adds scan time)", true)
   .option("--dashboard", "serve the interactive dashboard (can start scans from UI)", false)
   .option("--port <number>", "dashboard server port", (v) => parseNumber(v, 4173), 4173)
+  .option("--data-dir <dir>", "directory for multi-project data (dashboard mode)", "./a11y-projects")
   .action(async (url, options) => {
     const normalizedOptions = {
       ...options,
@@ -64,7 +65,7 @@ program
 
     if (options.dashboard) {
       await serveDashboard({
-        reportDir: options.reportDir,
+        dataDir: options.dataDir,
         port: options.port,
         defaultOptions: normalizedOptions,
         initialUrl: url || null

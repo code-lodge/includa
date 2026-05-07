@@ -68,7 +68,7 @@ async function writeRuleFile(reportDir, rule) {
   return relativePath
 }
 
-export async function createLiveStateTracker(reportDir, targetUrl) {
+export async function createLiveStateTracker(reportDir, targetUrl, { projectId = null, projectUrl = null } = {}) {
   const livePath = path.join(reportDir, "raw", "live-state.json")
 
   const state = {
@@ -114,7 +114,7 @@ export async function createLiveStateTracker(reportDir, targetUrl) {
   let lastFlushTime = 0
   let flushScheduled = false
 
-  await writeDashboard(reportDir)
+  await writeDashboard(reportDir, { projectId, projectUrl })
   await writeState(livePath, { ...state, topRules: [] })
 
   async function flushNow() {

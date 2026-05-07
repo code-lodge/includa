@@ -102,7 +102,7 @@ export async function runScan(targetUrl, options, signal) {
   const formats = parseFormats(options.format)
   const reportDir = path.resolve(options.reportDir)
   const manualChecklist = buildManualChecklist(options.wcagLevel)
-  const liveTracker = await createLiveStateTracker(reportDir, targetUrl)
+  const liveTracker = await createLiveStateTracker(reportDir, targetUrl, { projectId: options.projectId ?? null, projectUrl: options.projectUrl ?? null })
   await liveTracker.setChecklist(options.wcagLevel, manualChecklist)
 
   const resumeState = await loadResumeState(reportDir)

@@ -481,6 +481,7 @@ const DASHBOARD_HTML = `<!doctype html>
         <button id="stopScanBtn" type="button" class="btn-stop" style="display:none">Stop Scan</button>
         <button id="resumeScanBtn" type="button" class="btn-resume" style="display:none">Resume Scan</button>
         <a id="viewReportBtn" href="./report.html" style="display:none;padding:0.35rem 0.85rem;border-radius:999px;background:linear-gradient(90deg,rgba(45,212,191,0.9),rgba(56,189,248,0.85));color:#032430;font-weight:700;font-size:0.84rem;text-decoration:none">View Report →</a>
+        <!-- BACK_LINK -->
       </div>
     </header>
 
@@ -515,7 +516,7 @@ const DASHBOARD_HTML = `<!doctype html>
           <label for="scanConcurrency">Concurrency</label>
           <input id="scanConcurrency" type="number" value="10" min="1" max="50" />
         </div>
-        <div class="scan-field scan-field--wide">
+        <div class="scan-field scan-field--wide" __REPORT_DIR_STYLE__>
           <label for="scanReportDir">Report Directory <span class="scan-hint">(where reports are saved)</span></label>
           <div style="display:flex;gap:0.4rem">
             <input id="scanReportDir" type="text" placeholder="./a11y-report" style="flex:1" />
@@ -728,6 +729,15 @@ const DASHBOARD_HTML = `<!doctype html>
   </div>
 
   <script>
+    // API route vars — replaced by writeDashboard() for project-scoped routing
+    var A_SCAN = '__A_SCAN__'
+    var A_STOP = '__A_STOP__'
+    var A_RESUME = '__A_RESUME__'
+    var A_STATUS = '__A_STATUS__'
+    var A_REPORT_DIR = '__A_REPORT_DIR__'
+    var PROJECT_ID = '__PROJECT_ID__'
+    var PROJECT_URL = '__PROJECT_URL__'
+
     // --- sort state ---
     const sortState = {
       overview: { key: 'url', dir: 'asc' },
@@ -848,7 +858,7 @@ const DASHBOARD_HTML = `<!doctype html>
       const parsePatterns = (v) => (v || '').split(',').map(s => s.trim()).filter(Boolean)
 
       try {
-        const res = await fetch('/api/scan', {
+        const res = await fetch(A_SCAN, {
           method: 'POST',
           headers: { 'content-type': 'application/json' },
           body: JSON.stringify({
@@ -887,7 +897,7 @@ const DASHBOARD_HTML = `<!doctype html>
       btn.disabled = true
       btn.textContent = 'Stopping...'
       try {
-        await fetch('/api/scan/stop', { method: 'POST' })
+        await fetch(A_STOP, { method: 'POST' })
       } catch {}
       btn.disabled = false
       btn.textContent = 'Stop Scan'
@@ -899,7 +909,7 @@ const DASHBOARD_HTML = `<!doctype html>
       btn.disabled = true
       btn.textContent = 'Resuming...'
       try {
-        const res = await fetch('/api/scan/resume', { method: 'POST' })
+        const res = await fetch(A_RESUME, { method: 'POST' })
         const data = await res.json()
         if (res.ok) {
           document.getElementById('scanFormWrap').open = false
@@ -917,7 +927,7 @@ const DASHBOARD_HTML = `<!doctype html>
     })
 
     // --- report directory ---
-    fetch('/api/report-dir').then(r => r.json()).then(data => {
+    fetch(A_REPORT_DIR).then(r => r.json()).then(data => {
       document.getElementById('scanReportDir').value = data.reportDir || ''
     }).catch(() => {})
 
@@ -928,7 +938,7 @@ const DASHBOARD_HTML = `<!doctype html>
       const btn = document.getElementById('applyReportDir')
       btn.disabled = true
       try {
-        const res = await fetch('/api/report-dir', {
+        const res = await fetch(A_REPORT_DIR, {
           method: 'POST',
           headers: { 'content-type': 'application/json' },
           body: JSON.stringify({ dir })
@@ -946,6 +956,12 @@ const DASHBOARD_HTML = `<!doctype html>
       }
       btn.disabled = false
     })
+
+    // Pre-fill URL from project context (PROJECT_URL is injected by writeDashboard)
+    if (PROJECT_URL && PROJECT_URL !== '__PROJECT_URL__') {
+      var urlEl = document.getElementById('scanUrl')
+      if (urlEl && !urlEl.value) urlEl.value = PROJECT_URL
+    }
 
     // --- score ---
     const IMPACT_WEIGHT = { critical: 4, serious: 3, moderate: 2, minor: 1, unknown: 0.5 }
@@ -1188,7 +1204,7 @@ const DASHBOARD_HTML = `<!doctype html>
     async function refresh() {
       try {
         const [statusRes, liveRes] = await Promise.all([
-          fetch('/api/status?ts=' + Date.now(), { cache: 'no-store' }).catch(() => null),
+          fetch(A_STATUS + '?ts=' + Date.now(), { cache: 'no-store' }).catch(() => null),
           fetch('./raw/live-state.json?ts=' + Date.now(), { cache: 'no-store' })
         ])
 
@@ -1349,7 +1365,26 @@ const DASHBOARD_HTML = `<!doctype html>
 </body>
 </html>`
 
-export async function writeDashboard(reportDir) {
+export async function writeDashboard(reportDir, opts = {}) {
+  const { projectId = null, projectUrl = null } = opts
   await fs.mkdir(reportDir, { recursive: true })
-  await fs.writeFile(path.join(reportDir, "index.html"), DASHBOARD_HTML, "utf8")
+
+  const base = projectId ? `/api/projects/${projectId}` : "/api"
+  const backLink = projectId
+    ? `<a href="/" style="padding:0.35rem 0.85rem;border-radius:999px;background:rgba(45,212,191,0.12);color:var(--accent);font-size:0.84rem;text-decoration:none;border:1px solid rgba(45,212,191,0.3)">← All Projects</a>`
+    : ""
+  const reportDirStyle = projectId ? `style="display:none"` : ""
+
+  const html = DASHBOARD_HTML
+    .replace("'__A_SCAN__'", `'${base}/scan'`)
+    .replace("'__A_STOP__'", `'${base}/scan/stop'`)
+    .replace("'__A_RESUME__'", `'${base}/scan/resume'`)
+    .replace("'__A_STATUS__'", `'${base}/status'`)
+    .replace("'__A_REPORT_DIR__'", `'${base}/report-dir'`)
+    .replace("'__PROJECT_ID__'", projectId ? `'${projectId}'` : "''")
+    .replace("'__PROJECT_URL__'", projectUrl ? `'${projectUrl.replace(/'/g, "\\'")}'` : "''")
+    .replace("<!-- BACK_LINK -->", backLink)
+    .replace("__REPORT_DIR_STYLE__", reportDirStyle)
+
+  await fs.writeFile(path.join(reportDir, "index.html"), html, "utf8")
 }
