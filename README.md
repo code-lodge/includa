@@ -1,36 +1,32 @@
 # a11y-scan
 
-`a11y-scan` is an open-source accessibility scanning platform for large websites. It combines a Node.js CLI, Playwright rendering, axe-core analysis, and structured HTML/JSON/CSV reporting.
+Open-source accessibility scanner for large websites. Crawls your site with Playwright, detects WCAG 2.0/2.1/2.2 violations with axe-core, deduplicates issues across pages, and generates actionable HTML dashboards, static reports, JSON, and CSV.
 
-**Requires Node.js >= 18.0.0** (uses native `fetch`).
+**Requires Node.js >= 18.0.0**
 
 ## Features
 
-- Automatic URL discovery via `sitemap.xml`, sitemap indexes, and Shopify multi-sitemaps
-- Playwright BFS fallback crawling with robots.txt support and depth controls
-- WCAG 2.0/2.1/2.2 scanning across levels A, AA, and AAA with `@axe-core/playwright`
-- Concurrency-aware browser pooling for high-volume scans
-- Shopify-first URL sampling (`/products`, `/collections`, `/pages`, `/blogs`)
-- Structured report output for large sites (no monolithic report file)
-- Live-streaming web dashboard with real-time scan progress (`--dashboard`)
-- Hierarchical Violations Explorer (Rule -> Page -> Nodes) for large-site triage
-- Manual Audit Checklist for non-automatable AAA criteria
-- CI gates (`--fail-on-critical`, `--fail-on-serious`)
+- **URL discovery** via sitemap.xml, sitemap indexes, robots.txt, and BFS link crawling with depth controls
+- **WCAG 2.0/2.1/2.2** scanning at levels A, AA, and AAA using `@axe-core/playwright`
+- **CMS-aware template detection** for WordPress, Shopify, Drupal, Magento 2, Squarespace, HubSpot, and Ghost
+- **Template sampling** to scan N representative pages per page structure instead of every page
+- **Unique issue deduplication** across all pages — fingerprints violations by rule + normalized selector so repeated patterns count once
+- **Accessibility score** based on unique violation impact weights (critical=4, serious=3, moderate=2, minor=1)
+- **Element screenshots** with red-outline highlighting for each failing element
+- **AI Fix Prompts** — auto-generated, copy-pasteable prompts with full violation context for AI-assisted remediation
+- **Live dashboard** with real-time scan progress, stop/resume controls, and interactive results explorer
+- **Stop and resume** — interrupt a scan and pick up where you left off
+- **Keyboard, ARIA, and focus order checks** enabled by default
+- **CI gates** with `--fail-on-critical` and `--fail-on-serious`
+- **Concurrent browser pooling** for high-volume scans
 
 ## Install
 
 ```bash
 npm install
-npm link
 ```
 
-Run with npx (no global install):
-
-```bash
-npx a11y-scan@latest https://example.com
-```
-
-Playwright browser install (first run / CI image setup):
+Playwright browser install (first run / CI):
 
 ```bash
 npx playwright install chromium
@@ -39,32 +35,24 @@ npx playwright install chromium
 ## Usage
 
 ```bash
-a11y-scan https://example.com
-```
+# Basic scan
+node bin/a11y-scan.js https://example.com
 
-Example:
-
-```bash
-a11y-scan https://site.com \
+# Full scan with options
+node bin/a11y-scan.js https://site.com \
   --concurrency 10 \
   --max-pages 2000 \
   --exclude cart checkout account \
   --report-dir ./a11y-report
+
+# Start the live dashboard (scan + serve)
+node bin/a11y-scan.js https://example.com --dashboard
+
+# Serve an existing report without scanning
+node bin/a11y-scan.js --dashboard --report-dir ./a11y-report --port 4173
 ```
 
-Generate and immediately serve the live dashboard:
-
-```bash
-a11y-scan https://example.com --dashboard --report-dir ./a11y-report
-```
-
-With `--dashboard`, the web UI starts first and streams scan progress/results in real time while pages are being scanned. The dashboard automatically stops polling when the scan completes.
-
-Serve an existing report directory without scanning:
-
-```bash
-a11y-scan --dashboard --report-dir ./a11y-report --port 4173
-```
+With `--dashboard`, the web UI starts first and streams scan progress in real time. You can stop, resume, and start new scans from the dashboard UI.
 
 ## CLI Options
 
@@ -72,114 +60,120 @@ a11y-scan --dashboard --report-dir ./a11y-report --port 4173
 |--------|-------------|---------|
 | `--max-pages <number>` | Maximum pages to scan | `2000` |
 | `--concurrency <number>` | Parallel page scans | `10` |
-| `--exclude <patterns...>` | Exclude URL patterns (see below) | |
-| `--include <patterns...>` | Include URL patterns (see below) | |
-| `--locale <locale>` | axe locale (reserved) | `en` |
+| `--exclude <patterns...>` | Exclude URL patterns | |
+| `--include <patterns...>` | Include URL patterns | |
+| `--locale <locale>` | axe locale | `en` |
 | `--wcag-level <A\|AA\|AAA>` | WCAG conformance level | `AAA` |
 | `--sitemap <url>` | Explicit sitemap URL | |
 | `--depth <number>` | BFS crawl depth | `6` |
 | `--report-dir <dir>` | Output directory | `./a11y-report` |
 | `--format <formats>` | Comma-separated: html,json,csv | `html,json,csv` |
-| `--sample-products <number>` | Shopify product sample size | `0` |
+| `--sample-templates <number>` | Sample N pages per unique page structure (0 = off) | `0` |
 | `--timeout <ms>` | Page timeout in milliseconds | `30000` |
 | `--headless` / `--no-headless` | Run browser headless or with UI | `true` |
 | `--fail-on-critical` | Exit code 2 when critical issues exist | `false` |
 | `--fail-on-serious` | Exit code 2 when serious issues exist | `false` |
-| `--check-keyboard` | Run keyboard traversal checks | `false` |
-| `--check-aria` | Run ARIA attribute checks | `false` |
-| `--check-focus-order` | Run focus order checks | `false` |
-| `--contrast-screenshots` | Capture contrast screenshots | `false` |
-| `--dashboard` | Serve the live dashboard on a local port | `false` |
+| `--check-keyboard` | Keyboard traversal checks | `true` |
+| `--check-aria` | ARIA attribute checks | `true` |
+| `--check-focus-order` | Focus order checks | `true` |
+| `--contrast-screenshots` | Capture contrast-specific screenshots | `false` |
+| `--element-screenshots` | Capture element-level screenshots for violations | `true` |
+| `--dashboard` | Serve the interactive dashboard | `false` |
 | `--port <number>` | Dashboard server port | `4173` |
-
-By default, scans run with WCAG `AAA` tags (including 2.0/2.1/2.2 A/AA/AAA sets).
 
 ### URL Pattern Filtering
 
-The `--exclude` and `--include` options accept space-separated patterns. Each pattern is matched as a substring against the full URL.
-
-For regex patterns, use the `re:` prefix:
+`--exclude` and `--include` accept space-separated or comma-separated patterns. Each is matched as a substring against the full URL. Use the `re:` prefix for regex:
 
 ```bash
-# Exclude URLs containing "cart" or "checkout"
+# Exclude by substring
 a11y-scan https://site.com --exclude cart checkout
 
-# Exclude URLs matching a regex pattern
+# Exclude by regex
 a11y-scan https://site.com --exclude "re:^https://site\\.com/(cart|account)"
 
 # Include only product pages
 a11y-scan https://site.com --include "re:/products/"
 ```
 
-Patterns can also be comma-separated within a single argument:
-
-```bash
-a11y-scan https://site.com --exclude cart,checkout,account
-```
-
 ## Exit Codes
 
 | Code | Meaning |
 |------|---------|
-| `0` | Scan completed successfully (no CI threshold exceeded) |
+| `0` | Scan completed (no CI threshold exceeded) |
 | `1` | CLI error (missing URL, invalid arguments, runtime crash) |
-| `2` | CI threshold exceeded (`--fail-on-critical` or `--fail-on-serious` triggered) |
+| `2` | CI threshold exceeded (`--fail-on-critical` or `--fail-on-serious`) |
 
-## Report Structure
+## Report Output
 
-```text
+```
 a11y-report/
-  index.html            # Live-streaming dashboard (self-contained)
-  summary/
-    scan-summary.json
-    wcag-summary.json
-    severity-summary.json
+  index.html              # Live dashboard with real-time progress
+  report.html             # Static post-scan report with score
+  unique-issues.html      # Deduplicated issues + AI fix prompts
   rules/
-    color-contrast.html
+    color-contrast.html   # Per-rule detail pages
     ...
   templates/
-    product.html
-    collection.html
+    product.html          # Per-template detail pages
     ...
   pages/
-    products/
-    collections/
-    pages/
-    blogs/
-    home/
+    product/              # Per-page reports grouped by template
+    collection/
+    ...
   raw/
-    results.json
-    results.csv
-    rules.json
-    templates.json
-    scan-logs.json
-    live-state.json      # Incremental state used by the dashboard
+    results.json          # Full scan results
+    results.csv           # CSV export
+    rules.json            # Rule summary
+    templates.json        # Template summary
+    scan-logs.json        # Scan logs
+    live-state.json       # Real-time state for dashboard
+    resume-state.json     # Stop/resume checkpoint (deleted on completion)
+    screenshots/          # Element screenshots
+      color-contrast/
+      image-alt/
+      ...
 ```
 
-## Dashboards
+## Reports
 
-### Built-in Live Dashboard (recommended)
+### Live Dashboard (`index.html`)
 
-The built-in dashboard (`--dashboard` flag) is a self-contained HTML file written to `a11y-report/index.html`. It polls `raw/live-state.json` for real-time updates during the scan and stops polling automatically when the scan completes. No additional setup is required.
+Real-time scan progress with page-by-page results streaming. Includes an interactive violations explorer (Rule > Page > Nodes), severity breakdown, template grouping, and a manual audit checklist for non-automatable criteria.
 
-### React Dashboard (experimental)
+### Static Report (`report.html`)
 
-There is also a React dashboard scaffold in `dashboard/` built with Vite. This is a separate app intended for further customization:
+Post-scan summary with accessibility score, severity breakdown charts, violations by template, rules-to-fix table, and per-page violation counts. Links to the unique issues page and individual page/rule/template reports.
 
-```bash
-npm --prefix dashboard install
-npm run dashboard:dev
-```
+### Unique Issues (`unique-issues.html`)
 
-Set `VITE_REPORT_BASE` if your report folder is not `../a11y-report`.
+Every distinct accessibility violation deduplicated across all scanned pages. Filterable by impact level and template, searchable, with expandable details showing example selectors, HTML snippets, failure reasons, and element screenshots.
+
+Includes an **AI Fix Prompts** section — select a template from the dropdown to generate a structured prompt with all the violations affecting that template. Copy and paste into any AI assistant for remediation guidance.
 
 ## Architecture
 
-- `bin/cli.js` command parsing and runtime entrypoint
-- `src/crawler/*` sitemap, robots, and BFS discovery pipeline
-- `src/scanner/*` browser pool + axe/page scanning
-- `src/analysis/*` WCAG/rule/template aggregations
-- `src/reporting/*` structured report rendering (HTML/JSON/CSV), live-state streaming, dashboard server
-- `src/utils/*` URL normalization, HTML escaping, fetch timeout, and logging helpers
+```
+bin/
+  cli.js                — CLI parsing (commander)
+  a11y-scan.js          — Entry point
 
-Detailed developer notes: `docs/developer.md`.
+src/
+  index.js              — runScan() orchestrator
+  crawler/              — URL discovery (sitemap, robots.txt, BFS crawling, template sampling)
+  scanner/              — Browser pool + axe-core page scanning + element screenshots
+  analysis/
+    cms/                — CMS detection (WordPress, Shopify, Drupal, Magento, Squarespace, HubSpot, Ghost)
+    deduplication.js    — Unique violation fingerprinting
+    template-detection.js — URL-pattern + CMS-aware template grouping
+    rule-grouping.js    — Violations grouped by axe rule
+    wcag-grouping.js    — Violations grouped by WCAG criterion
+  reporting/            — HTML/JSON/CSV report generation, live state tracking, dashboard server
+  store/                — SQLite result store (better-sqlite3)
+  setup/                — Playwright browser installation helper
+  utils/                — URL normalization, HTML escaping, logging
+```
+
+## License
+
+[GPL-3.0](LICENSE)
