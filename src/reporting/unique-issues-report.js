@@ -597,7 +597,12 @@ export async function writeUniqueIssuesReport(reportDir, uniqueViolationsData, t
       lines.push('- These were detected by axe-core during an automated scan.')
 
       if (cmsInfo) {
-        lines.push('- CMS: WordPress' + (cmsInfo.isBlockTheme ? ' (Block/FSE theme)' : ' (Classic theme)'))
+        var PLATFORM_LABEL = { wordpress: 'WordPress', shopify: 'Shopify', drupal: 'Drupal', ghost: 'Ghost', hubspot: 'HubSpot', magento2: 'Magento 2', squarespace: 'Squarespace' }
+        var platformName = PLATFORM_LABEL[cmsInfo.platform] || cmsInfo.platform || 'Unknown CMS'
+        var platformDetail = ''
+        if (cmsInfo.platform === 'wordpress') platformDetail = cmsInfo.isBlockTheme ? ' (Block/FSE theme)' : ' (Classic theme)'
+        else if (cmsInfo.label) platformDetail = ' (' + cmsInfo.label + ')'
+        lines.push('- CMS: ' + platformName + platformDetail)
         if (cmsInfo.templateFile) lines.push('- Active template file: ' + cmsInfo.templateFile)
         if (cmsInfo.hierarchy && cmsInfo.hierarchy.length > 1) lines.push('- Template hierarchy: ' + cmsInfo.hierarchy.join(' → '))
         if (cmsInfo.isBlockTheme) {
@@ -611,15 +616,24 @@ export async function writeUniqueIssuesReport(reportDir, uniqueViolationsData, t
       lines.push('- For each violation, provide the corrected HTML/CSS code.')
       lines.push('- Show before and after code snippets so the developer knows exactly what to change.')
 
-      if (cmsInfo && cmsInfo.isBlockTheme) {
+      if (cmsInfo && cmsInfo.platform === 'wordpress' && cmsInfo.isBlockTheme) {
         lines.push('- This is a WordPress Block (FSE) theme. Templates are HTML files in templates/ and template parts are in parts/.')
         lines.push('- Fixes may require editing block markup (<!-- wp:group -->, etc.), theme.json, or custom block code.')
         lines.push('- For color/contrast issues, check theme.json palette definitions under settings.color.palette.')
-      } else if (cmsInfo) {
+      } else if (cmsInfo && cmsInfo.platform === 'wordpress') {
         lines.push('- This is a WordPress Classic theme. Templates are PHP files in the theme root.')
         lines.push('- If the fix requires changes to a CMS template, identify which template file is likely responsible.')
-      } else {
+      } else if (cmsInfo && cmsInfo.platform === 'shopify') {
+        lines.push('- This is a Shopify store. Templates are Liquid files in the theme.')
+        lines.push('- Fixes may require editing Liquid templates (sections/, snippets/, templates/) or theme settings.')
+        lines.push('- For styling issues, check assets/ CSS files or inline styles in Liquid templates.')
+      } else if (cmsInfo && cmsInfo.platform === 'drupal') {
+        lines.push('- This is a Drupal site. Templates are Twig files in the active theme.')
+        lines.push('- If the fix requires changes to a template, identify which Twig file is likely responsible.')
+      } else if (cmsInfo) {
         lines.push('- If the fix requires changes to a CMS template, identify which template file is likely responsible.')
+      } else {
+        lines.push('- If the fix requires changes to a template, identify which file is likely responsible.')
       }
 
       lines.push('- Explain WHY each fix resolves the accessibility issue.')
