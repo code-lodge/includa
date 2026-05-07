@@ -53,27 +53,44 @@ function totalByImpact(results, impact) {
   }, 0)
 }
 
-function resumeStatePath(reportDir) {
+function resumeMetaPath(reportDir) {
   return path.join(reportDir, "raw", "resume-state.json")
 }
 
-async function saveResumeState(reportDir, payload) {
+function resumeResultsPath(reportDir) {
+  return path.join(reportDir, "raw", "resume-results.jsonl")
+}
+
+async function saveResumeMeta(reportDir, meta) {
   const dir = path.join(reportDir, "raw")
   await fs.mkdir(dir, { recursive: true })
-  await fs.writeFile(resumeStatePath(reportDir), JSON.stringify(payload, null, 2), "utf8")
+  await fs.writeFile(resumeMetaPath(reportDir), JSON.stringify(meta), "utf8")
+}
+
+async function appendResumeResult(reportDir, pageResult) {
+  await fs.appendFile(resumeResultsPath(reportDir), JSON.stringify(pageResult) + "\n", "utf8")
 }
 
 async function loadResumeState(reportDir) {
   try {
-    const raw = await fs.readFile(resumeStatePath(reportDir), "utf8")
-    return JSON.parse(raw)
+    const raw = await fs.readFile(resumeMetaPath(reportDir), "utf8")
+    const meta = JSON.parse(raw)
+
+    let completedResults = []
+    try {
+      const lines = (await fs.readFile(resumeResultsPath(reportDir), "utf8")).split("\n")
+      completedResults = lines.filter(Boolean).map((line) => JSON.parse(line))
+    } catch {}
+
+    return { ...meta, completedResults }
   } catch {
     return null
   }
 }
 
 async function clearResumeState(reportDir) {
-  try { await fs.unlink(resumeStatePath(reportDir)) } catch {}
+  try { await fs.unlink(resumeMetaPath(reportDir)) } catch {}
+  try { await fs.unlink(resumeResultsPath(reportDir)) } catch {}
 }
 
 export async function runScan(targetUrl, options, signal) {
@@ -103,7 +120,8 @@ export async function runScan(targetUrl, options, signal) {
       await liveTracker.onPageScanned(result)
     }
   } else {
-    // Fresh scan: discover URLs
+    // Fresh scan: clear any stale resume files
+    await clearResumeState(reportDir)
     await liveTracker.setStatus("discovering", "Discovering URLs...")
     logger.info(`Discovering URLs for ${targetUrl}`)
     discovered = await discoverUrls(targetUrl, {
@@ -124,13 +142,12 @@ export async function runScan(targetUrl, options, signal) {
     await liveTracker.setStatus("scanning", `Scanning ${discovered.length} pages...`)
   }
 
-  // Save full state so stop/resume works
-  await saveResumeState(reportDir, {
+  // Save resume metadata (results are already in the JSONL file from prior run)
+  await saveResumeMeta(reportDir, {
     targetUrl,
     options,
     allUrls: [...(priorResults.map((r) => r.url)), ...discovered],
     remaining: discovered,
-    completedResults: priorResults
   })
 
   const scannedUrls = new Set()
@@ -154,27 +171,27 @@ export async function runScan(targetUrl, options, signal) {
       await liveTracker.onPageScanned(pageResult)
       await liveTracker.setLogs(logger.logs)
 
-      // Update resume state incrementally
+      // Append result to JSONL + update remaining URLs in metadata
+      await appendResumeResult(reportDir, pageResult)
       const remaining = discovered.filter((u) => !scannedUrls.has(u))
-      await saveResumeState(reportDir, {
+      await saveResumeMeta(reportDir, {
         targetUrl,
         options,
         allUrls: [...(priorResults.map((r) => r.url)), ...discovered],
         remaining,
-        completedResults: [...priorResults, ...newResults]
       })
     }
   }, logger, signal)
 
-  // If aborted, save state and return early without generating final reports
+  // If aborted, save metadata and return early without generating final reports
+  // (results were already appended to JSONL incrementally)
   if (signal?.aborted) {
     const remaining = discovered.filter((u) => !scannedUrls.has(u))
-    await saveResumeState(reportDir, {
+    await saveResumeMeta(reportDir, {
       targetUrl,
       options,
       allUrls: [...(priorResults.map((r) => r.url)), ...discovered],
       remaining,
-      completedResults: [...priorResults, ...newResults]
     })
     logger.warn(`Scan stopped — ${newResults.length} pages scanned, ${remaining.length} remaining`)
     await liveTracker.setLogs(logger.logs)
