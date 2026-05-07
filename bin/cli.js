@@ -52,6 +52,7 @@ program
   .option("--check-aria", "run ARIA attribute checks", true)
   .option("--check-focus-order", "run focus order checks", true)
   .option("--contrast-screenshots", "capture screenshots for color contrast issues", false)
+  .option("--element-screenshots", "capture element-level screenshots for each violation (adds scan time)", true)
   .option("--dashboard", "serve the interactive dashboard (can start scans from UI)", false)
   .option("--port <number>", "dashboard server port", (v) => parseNumber(v, 4173), 4173)
   .action(async (url, options) => {

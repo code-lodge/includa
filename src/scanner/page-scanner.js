@@ -3,6 +3,7 @@ import path from "node:path"
 import { runAxe } from "./axe-runner.js"
 import { BrowserPool } from "./browser-pool.js"
 import { safeSlug } from "../utils/url-utils.js"
+import { detectCms, cmsSignalScript } from "../analysis/cms/index.js"
 
 async function runKeyboardCheck(page) {
   const focusableCount = await page.$$eval(
@@ -51,6 +52,62 @@ async function runFocusOrderCheck(page) {
   return { firstFocusableElements: labels }
 }
 
+const MAX_SCREENSHOT_WIDTH = 900
+const MAX_SCREENSHOT_HEIGHT = 600
+const SCREENSHOT_PADDING = 12
+
+async function captureElementScreenshots(page, violations, screenshotsBaseDir, urlSlug) {
+  for (const violation of violations) {
+    // Capture only the first node per violation to keep disk usage bounded
+    const node = violation.nodes[0]
+    if (!node || !node.target || node.target.length === 0) continue
+
+    // Skip cross-frame targets (multiple selectors = iframe/shadow context)
+    if (node.target.length > 1) continue
+
+    const selector = node.target[0]
+
+    try {
+      const locator = page.locator(selector).first()
+      await locator.scrollIntoViewIfNeeded({ timeout: 2000 })
+      const box = await locator.boundingBox({ timeout: 2000 })
+      if (!box || box.width === 0 || box.height === 0) continue
+
+      const clip = {
+        x: Math.max(0, box.x - SCREENSHOT_PADDING),
+        y: Math.max(0, box.y - SCREENSHOT_PADDING),
+        width: Math.min(box.width + SCREENSHOT_PADDING * 2, MAX_SCREENSHOT_WIDTH),
+        height: Math.min(box.height + SCREENSHOT_PADDING * 2, MAX_SCREENSHOT_HEIGHT)
+      }
+
+      await page.evaluate((sel) => {
+        const el = document.querySelector(sel)
+        if (el) {
+          el.style.setProperty("outline", "3px solid #ef4444", "important")
+          el.style.setProperty("outline-offset", "2px", "important")
+        }
+      }, selector)
+
+      const ruleDir = path.join(screenshotsBaseDir, violation.id)
+      await fs.mkdir(ruleDir, { recursive: true })
+      const filename = `${urlSlug}.png`
+      await page.screenshot({ path: path.join(ruleDir, filename), clip })
+
+      await page.evaluate((sel) => {
+        const el = document.querySelector(sel)
+        if (el) {
+          el.style.removeProperty("outline")
+          el.style.removeProperty("outline-offset")
+        }
+      }, selector)
+
+      node.screenshotPath = `raw/screenshots/${violation.id}/${filename}`
+    } catch {
+      // Silently skip — element may be hidden, removed, or selector invalid
+    }
+  }
+}
+
 async function disableCache(page) {
   const client = await page.context().newCDPSession(page)
   await client.send("Network.setCacheDisabled", { cacheDisabled: true })
@@ -71,12 +128,15 @@ async function scanSinglePage(page, url, options) {
   // Allow async rendering (JS frameworks, lazy hydration) to stabilise
   await page.waitForTimeout(STABILIZATION_DELAY_MS)
 
-  const [title, axeResults] = await Promise.all([
+  const [title, axeResults, cmsSignals] = await Promise.all([
     page.title(),
-    runAxe(page, options.locale, options.wcagLevel)
+    runAxe(page, options.locale, options.wcagLevel),
+    page.evaluate(cmsSignalScript())
   ])
 
   const { violations, passes, incomplete, inapplicable, rulesRun } = axeResults
+
+  const cms = detectCms(cmsSignals)
   const checks = {}
   if (options.checkKeyboard) checks.keyboard = await runKeyboardCheck(page)
   if (options.checkAria) checks.aria = await runAriaCheck(page)
@@ -86,6 +146,11 @@ async function scanSinglePage(page, url, options) {
     const screenshotsDir = path.join(options.reportDir, "raw", "screenshots")
     await fs.mkdir(screenshotsDir, { recursive: true })
     await page.screenshot({ path: path.join(screenshotsDir, `${safeSlug(url)}.png`), fullPage: true })
+  }
+
+  if (options.elementScreenshots && violations.length > 0) {
+    const screenshotsBaseDir = path.join(options.reportDir, "raw", "screenshots")
+    await captureElementScreenshots(page, violations, screenshotsBaseDir, safeSlug(url))
   }
 
   return {
@@ -100,7 +165,8 @@ async function scanSinglePage(page, url, options) {
     incomplete,
     inapplicable,
     rulesRun,
-    checks
+    checks,
+    cms
   }
 }
 
