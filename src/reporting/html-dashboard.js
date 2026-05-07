@@ -288,6 +288,12 @@ const DASHBOARD_HTML = `<!doctype html>
     th { color: #c3d9e7; }
     .muted { color: var(--muted); }
 
+    .sub-label {
+      margin-top: 0.22rem;
+      font-size: 0.74rem;
+      color: var(--muted);
+    }
+
     .detail-box {
       border: 1px solid rgba(159, 180, 195, 0.22);
       background: rgba(4, 15, 24, 0.76);
@@ -536,12 +542,17 @@ const DASHBOARD_HTML = `<!doctype html>
       <article class="stat"><div class="label">Compliance Achieved</div><div id="complianceLevel" class="value">–</div></article>
       <article class="stat"><div class="label">Discovered Pages</div><div id="discoveredPages" class="value">0</div></article>
       <article class="stat"><div class="label">Scanned Pages</div><div id="scannedPages" class="value">0</div></article>
-      <article class="stat"><div class="label">Violations</div><div id="totalViolations" class="value" style="color: var(--critical)">0</div></article>
-      <article class="stat"><div class="label">Passes</div><div id="totalPasses" class="value" style="color: #22c55e">0</div></article>
-      <article class="stat"><div class="label">Incomplete</div><div id="totalIncomplete" class="value" style="color: var(--warn)">0</div></article>
-      <article class="stat"><div class="label">Inapplicable</div><div id="totalInapplicable" class="value" style="color: var(--muted)">0</div></article>
+      <article class="stat"><div class="label">Violations</div><div id="totalViolations" class="value" style="color: var(--critical)">0</div><div id="uniqueViolations" class="sub-label">0 unique rules</div></article>
+      <article class="stat"><div class="label">Passes</div><div id="totalPasses" class="value" style="color: #22c55e">0</div><div id="uniquePasses" class="sub-label">0 unique rules</div></article>
+      <article class="stat"><div class="label">Incomplete</div><div id="totalIncomplete" class="value" style="color: var(--warn)">0</div><div id="uniqueIncomplete" class="sub-label">0 unique rules</div></article>
+      <article class="stat"><div class="label">Inapplicable</div><div id="totalInapplicable" class="value" style="color: var(--muted)">0</div><div id="uniqueInapplicable" class="sub-label">0 unique rules</div></article>
       <article class="stat"><div class="label">Rules Run</div><div id="rulesRunCount" class="value">0</div></article>
+      <article class="stat"><div class="label">Score</div><div id="liveScore" class="value" style="font-size:1.6rem">–</div></article>
     </section>
+
+    <div id="reportLinks" style="display:none;margin:-0.5rem 0 1rem;gap:0.75rem;flex-wrap:wrap">
+      <a id="viewUniqueIssuesBtn" href="./unique-issues.html" style="padding:0.35rem 0.85rem;border-radius:999px;background:linear-gradient(90deg,rgba(251,146,60,0.9),rgba(239,68,68,0.85));color:#fff;font-weight:700;font-size:0.84rem;text-decoration:none">View Unique Issues →</a>
+    </div>
 
     <nav class="tabs" role="tablist" aria-label="Dashboard sections">
       <button class="tab active" role="tab" aria-selected="true" aria-controls="view-overview" data-view="overview" type="button">Overview</button>
@@ -936,14 +947,30 @@ const DASHBOARD_HTML = `<!doctype html>
       btn.disabled = false
     })
 
+    // --- score ---
+    const IMPACT_WEIGHT = { critical: 4, serious: 3, moderate: 2, minor: 1, unknown: 0.5 }
+    const SCORE_MAX = 200
+    function computeLiveScore(ruleCatalog) {
+      if (!ruleCatalog || ruleCatalog.length === 0) return null
+      const weighted = ruleCatalog.reduce(function(sum, r) { return sum + (IMPACT_WEIGHT[r.impact] || 0.5) }, 0)
+      return Math.max(0, Math.round((1 - weighted / SCORE_MAX) * 100))
+    }
+    function scoreColor(s) { return s >= 90 ? '#22c55e' : s >= 70 ? '#fb923c' : '#ef4444' }
+
     // --- utilities ---
-    function renderBars(el, values) {
+    function safeSlugClient(str) {
+      return String(str || '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 120) || 'unknown'
+    }
+    function renderBars(el, values, linkPrefix) {
       const entries = Object.entries(values || {})
       if (entries.length === 0) { el.innerHTML = '<span class="muted">No data yet</span>'; return }
       const max = Math.max(...entries.map(([, v]) => v), 1)
       el.innerHTML = entries.map(([label, value]) => {
         const width = Math.round((value / max) * 100)
-        return '<div class="bar-row"><span>' + label + '</span><div class="bar" role="meter" aria-valuenow="' + value + '" aria-valuemin="0" aria-valuemax="' + max + '" aria-label="' + label + '"><span style="width:' + width + '%"></span></div><strong>' + value + '</strong></div>'
+        const labelHtml = linkPrefix
+          ? '<a href="' + linkPrefix + safeSlugClient(label) + '.html" style="color:inherit;text-decoration:underline;text-underline-offset:2px">' + escapeHtml(label) + '</a>'
+          : '<span>' + escapeHtml(label) + '</span>'
+        return '<div class="bar-row">' + labelHtml + '<div class="bar" role="meter" aria-valuenow="' + value + '" aria-valuemin="0" aria-valuemax="' + max + '" aria-label="' + label + '"><span style="width:' + width + '%"></span></div><strong>' + value + '</strong></div>'
       }).join('')
     }
 
@@ -1197,10 +1224,32 @@ const DASHBOARD_HTML = `<!doctype html>
         document.getElementById('discoveredPages').textContent = data.discoveredPages || 0
         document.getElementById('scannedPages').textContent = data.scannedPages || 0
         document.getElementById('totalViolations').textContent = data.totalViolations || 0
+        document.getElementById('uniqueViolations').textContent = (data.totalRulesTriggered || 0) + ' unique rules'
         document.getElementById('totalPasses').textContent = data.totalPasses || 0
+        document.getElementById('uniquePasses').textContent = (data.uniquePassRules || 0) + ' unique rules'
         document.getElementById('totalIncomplete').textContent = data.totalIncomplete || 0
+        document.getElementById('uniqueIncomplete').textContent = (data.uniqueIncompleteRules || 0) + ' unique rules'
         document.getElementById('totalInapplicable').textContent = data.totalInapplicable || 0
+        document.getElementById('uniqueInapplicable').textContent = (data.uniqueInapplicableRules || 0) + ' unique rules'
         document.getElementById('rulesRunCount').textContent = (data.rulesRun || []).length
+
+        var score = computeLiveScore(data.ruleCatalog)
+        var scoreEl = document.getElementById('liveScore')
+        if (score !== null) {
+          scoreEl.textContent = score + '/100'
+          scoreEl.style.color = scoreColor(score)
+        } else {
+          scoreEl.textContent = '–'
+          scoreEl.style.color = ''
+        }
+
+        var reportLinksEl = document.getElementById('reportLinks')
+        if (data.scannedPages > 0) {
+          reportLinksEl.style.display = 'flex'
+        }
+        if (data.status === 'completed') {
+          document.getElementById('viewReportBtn').style.display = 'inline-block'
+        }
 
         renderBars(document.getElementById('resultTypeBars'), {
           Violations: data.totalViolations || 0,
@@ -1209,7 +1258,7 @@ const DASHBOARD_HTML = `<!doctype html>
           Inapplicable: data.totalInapplicable || 0
         })
         renderBars(document.getElementById('severityBars'), data.severity || {})
-        renderBars(document.getElementById('templateBars'), data.templateTotals || {})
+        renderBars(document.getElementById('templateBars'), data.templateTotals || {}, './templates/')
 
         const rulesRun = data.rulesRun || []
         document.getElementById('rulesList').innerHTML = rulesRun.length

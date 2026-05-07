@@ -3,6 +3,10 @@ import path from "node:path"
 import { writeDashboard } from "./html-dashboard.js"
 import { safeSlug, detectTemplate } from "../utils/url-utils.js"
 
+function resolveTemplate(pageResult) {
+  return pageResult.cms?.templateFile || detectTemplate(pageResult.url)
+}
+
 async function writeState(filePath, state) {
   await fs.mkdir(path.dirname(filePath), { recursive: true })
   await fs.writeFile(filePath, JSON.stringify(state, null, 2), "utf8")
@@ -21,6 +25,7 @@ async function writePageDetail(reportDir, pageResult, template) {
     scannedAt: pageResult.scannedAt,
     durationMs: pageResult.durationMs,
     template,
+    cms: pageResult.cms ?? null,
     checks: pageResult.checks,
     error: pageResult.error,
     rulesRun: pageResult.rulesRun || [],
@@ -47,6 +52,7 @@ function newRuleEntry(rule) {
     id: rule.id,
     help: rule.help,
     helpUrl: rule.helpUrl,
+    impact: rule.impact || null,
     count: 0,
     pages: []
   }
@@ -128,6 +134,7 @@ export async function createLiveStateTracker(reportDir, targetUrl) {
       state.ruleCatalog.push({
         id: rule.id,
         help: rule.help,
+        impact: rule.impact || null,
         count: rule.count,
         pages: rule.pages.length,
         file
@@ -188,6 +195,9 @@ export async function createLiveStateTracker(reportDir, targetUrl) {
     await writeState(livePath, {
       ...state,
       totalRulesTriggered: Object.keys(state.rules).length,
+      uniquePassRules: Object.keys(state.passesRules).length,
+      uniqueIncompleteRules: Object.keys(state.incompleteRules).length,
+      uniqueInapplicableRules: Object.keys(state.inapplicableRules).length,
       topRules,
       logs: state.logs.slice(-150)
     })
@@ -225,7 +235,7 @@ export async function createLiveStateTracker(reportDir, targetUrl) {
     },
     onPageScanned: async (pageResult) => {
       state.scannedPages += 1
-      const template = detectTemplate(pageResult.url)
+      const template = resolveTemplate(pageResult)
       const detailPath = await writePageDetail(reportDir, pageResult, template)
       const pageViolationCount = pageResult.violations.reduce((sum, item) => sum + Math.max(1, item.nodes.length), 0)
       const pagePassCount = (pageResult.passes || []).reduce((sum, item) => sum + Math.max(1, item.nodes.length), 0)

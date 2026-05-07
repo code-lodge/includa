@@ -25,6 +25,9 @@ export async function exportJsonAndCsv(reportDir, payload) {
   await writeJson(path.join(rawDir, "rules.json"), payload.ruleSummary)
   await writeJson(path.join(rawDir, "templates.json"), payload.templateSummary)
   await writeJson(path.join(rawDir, "scan-logs.json"), payload.logs)
+  if (payload.uniqueViolations) {
+    await writeJson(path.join(rawDir, "unique-violations.json"), payload.uniqueViolations)
+  }
 
   // CSV: use node counts for both "violations" column and per-severity columns
   // so the numbers are internally consistent.

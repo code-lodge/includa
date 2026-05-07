@@ -2,7 +2,17 @@ import fs from "node:fs/promises"
 import path from "node:path"
 import { escapeHtml, safeSlug, templateFolder } from "../utils/url-utils.js"
 
-function computeScore(severitySummary) {
+const UNIQUE_IMPACT_WEIGHT = { critical: 4, serious: 3, moderate: 2, minor: 1, unknown: 0.5 }
+// 50 critical unique violations → score 0; 0 violations → score 100
+const SCORE_MAX_WEIGHT = 200
+
+function computeScore(uniqueItems, severitySummary) {
+  if (uniqueItems) {
+    if (uniqueItems.length === 0) return 100
+    const weighted = uniqueItems.reduce((sum, item) => sum + (UNIQUE_IMPACT_WEIGHT[item.impact] ?? 0.5), 0)
+    return Math.max(0, Math.round((1 - weighted / SCORE_MAX_WEIGHT) * 100))
+  }
+  // fallback when unique data is unavailable
   const { totalPasses = 0, totalViolations = 0, totalIncomplete = 0 } = severitySummary
   const total = totalPasses + totalViolations + totalIncomplete
   if (total === 0) return 100
@@ -55,8 +65,9 @@ function pagePath(page) {
 
 export async function writeStaticReport(reportDir, payload) {
   const { summary, severitySummary, ruleSummary, templateSummary, pages } = payload
+  const uniqueItems = (payload.uniqueViolations && payload.uniqueViolations.uniqueViolations) || null
   const impacts = severitySummary.impacts || {}
-  const score = computeScore(severitySummary)
+  const score = computeScore(uniqueItems, severitySummary)
   const color = scoreColor(score)
   const label = scoreLabel(score)
 
@@ -76,6 +87,14 @@ export async function writeStaticReport(reportDir, payload) {
       return bCount - aCount
     })
 
+  const uniqueImpacts = {}
+  const uniqueTotal = uniqueItems ? uniqueItems.length : null
+  if (uniqueItems) {
+    for (const u of uniqueItems) {
+      uniqueImpacts[u.impact] = (uniqueImpacts[u.impact] || 0) + 1
+    }
+  }
+
   const maxImpact = Math.max(...Object.values(impacts), 1)
   const maxTemplate = Math.max(...templateData.map(([, t]) => t.totalViolations), 1)
   const maxRule = Math.max(...violationRules.map((r) => r.occurrences), 1)
@@ -93,7 +112,7 @@ export async function writeStaticReport(reportDir, payload) {
 
   const templateRows = templateData.map(([name, t]) => `
     <div class="bar-row">
-      <span class="bar-label">${escapeHtml(name)}</span>
+      <a href="./templates/${safeSlug(name)}.html" class="bar-label" style="color:inherit;text-decoration:underline;text-underline-offset:2px">${escapeHtml(name)}</a>
       ${bar(t.totalViolations, maxTemplate, "#2dd4bf")}
       <strong class="bar-count">${t.totalViolations}</strong>
     </div>`).join("")
@@ -415,6 +434,15 @@ export async function writeStaticReport(reportDir, payload) {
   <div class="shell">
     <a class="back-link" href="./index.html">← Back to Live Dashboard</a>
 
+    <div style="margin-bottom:1rem">
+      <a href="./unique-issues.html" style="
+        display:inline-flex;align-items:center;gap:0.5rem;
+        padding:0.55rem 1.1rem;border-radius:999px;
+        background:rgba(45,212,191,0.12);border:1px solid rgba(45,212,191,0.4);
+        color:#2dd4bf;font-weight:600;font-size:0.88rem;text-decoration:none;
+      ">View Unique Issues — deduplicated, priority-ordered →</a>
+    </div>
+
     <header class="hero">
       <div class="hero-meta">
         <h1>Accessibility Report</h1>
@@ -425,12 +453,16 @@ export async function writeStaticReport(reportDir, payload) {
           ? '<p style="color:#22c55e;font-weight:600;margin-top:0.5rem">No violations found — great job!</p>'
           : `<p style="color:#9fb4c3;margin-top:0.5rem">Below are the issues that need to be fixed to improve accessibility.</p>`}
       </div>
-      <div class="score-ring" style="border-color:${color};color:${color}" aria-label="Score: ${score}/100 — ${label}">
-        <span class="score-num">${score}</span>
-        <span class="score-lbl">${escapeHtml(label)}</span>
+      <div>
+        <div class="score-ring" style="border-color:${color};color:${color}" aria-label="Score: ${score}/100 — ${label}">
+          <span class="score-num">${score}</span>
+          <span class="score-lbl">${escapeHtml(label)}</span>
+        </div>
+        ${uniqueTotal !== null ? `<p style="margin:0.5rem 0 0;font-size:0.76rem;color:var(--muted);text-align:center;max-width:160px">Based on ${uniqueTotal} unique issue${uniqueTotal !== 1 ? "s" : ""} to fix</p>` : ""}
       </div>
     </header>
 
+    <p style="margin:0 0 0.35rem;font-size:0.74rem;font-weight:600;text-transform:uppercase;letter-spacing:0.08em;color:var(--muted)">All pages — raw totals</p>
     <section class="grid-stats" aria-label="Summary statistics">
       <article class="stat">
         <div class="stat-label">Pages Scanned</div>
@@ -473,6 +505,31 @@ export async function writeStaticReport(reportDir, payload) {
         <div class="stat-value">${violationRules.length}</div>
       </article>
     </section>
+
+    ${uniqueTotal !== null ? `
+    <p style="margin:1.1rem 0 0.35rem;font-size:0.74rem;font-weight:600;text-transform:uppercase;letter-spacing:0.08em;color:var(--accent)">Unique actionable issues — deduplicated</p>
+    <section class="grid-stats" aria-label="Unique actionable issues" style="border-color:rgba(45,212,191,0.2)">
+      <article class="stat" style="border-color:rgba(45,212,191,0.2)">
+        <div class="stat-label">Unique Issues</div>
+        <div class="stat-value" style="color:var(--accent)">${uniqueTotal}</div>
+      </article>
+      <article class="stat" style="border-color:rgba(45,212,191,0.2)">
+        <div class="stat-label">Critical (unique)</div>
+        <div class="stat-value" style="color:#ef4444">${uniqueImpacts.critical || 0}</div>
+      </article>
+      <article class="stat" style="border-color:rgba(45,212,191,0.2)">
+        <div class="stat-label">Serious (unique)</div>
+        <div class="stat-value" style="color:#fb923c">${uniqueImpacts.serious || 0}</div>
+      </article>
+      <article class="stat" style="border-color:rgba(45,212,191,0.2)">
+        <div class="stat-label">Moderate (unique)</div>
+        <div class="stat-value" style="color:#facc15">${uniqueImpacts.moderate || 0}</div>
+      </article>
+      <article class="stat" style="border-color:rgba(45,212,191,0.2)">
+        <div class="stat-label">Minor (unique)</div>
+        <div class="stat-value" style="color:#60a5fa">${uniqueImpacts.minor || 0}</div>
+      </article>
+    </section>` : ""}
 
     ${severityRows || templateRows ? `
     <div class="grid-2">

@@ -6,7 +6,7 @@ function renderTemplatePage(template, pages, metrics) {
   const rows = pages.map((page) => `
     <tr>
       <td><a href="../pages/${templateFolder(template)}/${safeSlug(page.url)}.html">${escapeHtml(page.url)}</a></td>
-      <td>${page.violations.length}</td>
+      <td>${page.violationCount}</td>
       <td>${escapeHtml(page.status)}</td>
     </tr>
   `).join("")
@@ -134,12 +134,19 @@ function renderTemplatePage(template, pages, metrics) {
 </html>`
 }
 
-export async function writeTemplateReports(reportDir, templateSummary, pages) {
+export async function writeTemplateReports(reportDir, templateSummary, store) {
   const outputDir = path.join(reportDir, "templates")
   await fs.mkdir(outputDir, { recursive: true })
 
+  const pagesByTemplate = {}
+  for (const page of store.iteratePages()) {
+    const t = page.template
+    if (!pagesByTemplate[t]) pagesByTemplate[t] = []
+    pagesByTemplate[t].push({ url: page.url, violationCount: page.violations.length, status: page.status })
+  }
+
   for (const [template, metrics] of Object.entries(templateSummary.templates)) {
-    const templatePages = pages.filter((page) => page.template === template)
+    const templatePages = pagesByTemplate[template] || []
     const filePath = path.join(outputDir, `${safeSlug(template)}.html`)
     await fs.writeFile(filePath, renderTemplatePage(template, templatePages, metrics), "utf8")
   }

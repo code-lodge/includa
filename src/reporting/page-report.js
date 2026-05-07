@@ -2,10 +2,69 @@ import fs from "node:fs/promises"
 import path from "node:path"
 import { safeSlug, templateFolder, escapeHtml } from "../utils/url-utils.js"
 
+const PLATFORM_LABEL = {
+  wordpress:   "WordPress",
+  shopify:     "Shopify",
+  drupal:      "Drupal",
+  ghost:       "Ghost",
+  hubspot:     "HubSpot",
+  magento2:    "Magento 2",
+  squarespace: "Squarespace",
+}
+
+function renderCmsPanel(cms) {
+  const platform = PLATFORM_LABEL[cms.platform] || cms.platform
+
+  let bodyHtml
+  if (cms.noEdit) {
+    bodyHtml = `<p style="margin:0;font-size:0.82rem;color:#9fb4c3">
+      This platform uses a visual editor — templates are not directly editable as files.
+      Make changes in the <strong style="color:#e9f2f8">${escapeHtml(platform)}</strong> design tools.
+    </p>`
+  } else if (!cms.templateFile) {
+    bodyHtml = `<p style="margin:0;font-size:0.82rem;color:#9fb4c3">
+      Template could not be identified (headless or custom theme).
+    </p>`
+  } else if (cms.hierarchy && cms.hierarchy.length > 1) {
+    bodyHtml = `<p style="margin:0 0 0.4rem;font-size:0.82rem;color:#9fb4c3">
+        <strong style="color:#e9f2f8">${escapeHtml(cms.label || "")}</strong>
+        — template lookup order (most specific → fallback):
+      </p>
+      <ol style="margin:0;padding-left:1.4rem;font-size:0.82rem">
+        ${cms.hierarchy.map((f, i) =>
+          `<li style="${i === 0 ? "color:#2dd4bf;font-weight:600" : "color:#9fb4c3"}">${escapeHtml(f)}${i === 0 ? " ← active" : ""}</li>`
+        ).join("")}
+      </ol>`
+  } else {
+    bodyHtml = `<p style="margin:0;font-size:0.82rem;color:#9fb4c3">
+      Edit <code style="color:#2dd4bf;font-size:0.8rem;background:rgba(8,23,36,0.9);border:1px solid rgba(120,158,182,0.25);border-radius:5px;padding:0.06rem 0.26rem">${escapeHtml(cms.templateFile)}</code>
+      in your theme to fix issues on this page type.
+    </p>`
+  }
+
+  return `
+    <details style="margin-bottom:1rem;border:1px solid rgba(157,197,220,0.22);border-radius:10px;padding:0.7rem 1rem;background:rgba(12,29,42,0.7)">
+      <summary style="cursor:pointer;font-size:0.83rem;color:#2dd4bf;font-weight:600;user-select:none">
+        ${escapeHtml(platform)} template — ${escapeHtml(cms.label || cms.templateType || "unknown")}
+      </summary>
+      <div style="margin-top:0.6rem">${bodyHtml}</div>
+    </details>`
+}
+
 function renderPageHtml(page) {
   const rows = page.violations.map((violation) => {
     const nodes = violation.nodes
-      .map((node) => `<li><code>${escapeHtml((node.target || []).join(" "))}</code></li>`)
+      .map((node) => {
+        const selector = escapeHtml((node.target || []).join(" "))
+        const screenshot = node.screenshotPath
+          ? `<img src="${escapeHtml("../../" + node.screenshotPath)}"
+                  alt="Screenshot of failing element"
+                  style="display:block;max-width:100%;max-height:200px;object-fit:contain;
+                         border:1px solid rgba(157,197,220,0.22);border-radius:6px;margin-top:0.4rem;"
+                  loading="lazy" />`
+          : ""
+        return `<li><code>${selector}</code>${screenshot}</li>`
+      })
       .join("")
 
     return `
@@ -164,6 +223,7 @@ function renderPageHtml(page) {
       <div class="card"><div class="card-label">Violations</div><div class="card-value" style="color:#ef4444">${page.violations.length}</div></div>
       <div class="card"><div class="card-label">Scan Time</div><div class="card-value">${page.durationMs} ms</div></div>
     </div>
+    ${page.cms ? renderCmsPanel(page.cms) : ""}
     ${rows || '<p class="empty">No violations found.</p>'}
   </main>
 </body>

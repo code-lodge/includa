@@ -4,6 +4,97 @@ import path from "node:path"
 import { runScan } from "../index.js"
 import { writeDashboard } from "./html-dashboard.js"
 
+/**
+ * Walk a JSON fragment and find the closing bracket/brace that matches the
+ * opening character at `start`, respecting nested structures and strings.
+ * Returns the parsed value or null on failure.
+ */
+function extractJsonValue(text, key) {
+  const keyIdx = text.indexOf(key)
+  if (keyIdx === -1) return null
+  const colonIdx = text.indexOf(":", keyIdx + key.length)
+  if (colonIdx === -1) return null
+
+  let start = colonIdx + 1
+  while (start < text.length && /\s/.test(text[start])) start++
+  if (start >= text.length) return null
+
+  const opener = text[start]
+  const closer = opener === "{" ? "}" : opener === "[" ? "]" : null
+  if (!closer) return null
+
+  let depth = 0
+  let inString = false
+  for (let i = start; i < text.length; i++) {
+    const ch = text[i]
+    if (inString) {
+      if (ch === "\\") { i++ } // skip escaped char
+      else if (ch === '"') inString = false
+    } else {
+      if (ch === '"') inString = true
+      else if (ch === opener) depth++
+      else if (ch === closer) {
+        depth--
+        if (depth === 0) {
+          try { return JSON.parse(text.slice(start, i + 1)) } catch { return null }
+        }
+      }
+    }
+  }
+  return null
+}
+
+/**
+ * Read and parse resume-state.json.  If the file is too large or corrupt
+ * (e.g. an old format that stored full axe results), fall back to a partial
+ * read of the first 4 MB which always contains targetUrl, options, and the
+ * remaining[] URL list (these appear before the massive completedResults
+ * array in the old format).  On successful recovery the corrupt file is
+ * replaced with a clean slim version so the next resume works normally.
+ */
+async function readResumeState(resumePath) {
+  // Fast path: normal parse (works for every new slim-format file)
+  try {
+    const raw = await fs.readFile(resumePath, "utf8")
+    return JSON.parse(raw)
+  } catch {
+    // Fall through to partial-read recovery
+  }
+
+  let fd
+  try {
+    fd = await fs.open(resumePath, "r")
+    // 4 MB is enough to capture targetUrl, options, and the remaining[] array
+    // even for very large sites (12 000 URLs × ~60 chars ≈ 720 KB).
+    const buf = Buffer.alloc(4 * 1024 * 1024)
+    const { bytesRead } = await fd.read(buf, 0, buf.length, 0)
+    const partial = buf.subarray(0, bytesRead).toString("utf8")
+
+    // Pull targetUrl — a plain string value
+    const urlMatch = partial.match(/"targetUrl"\s*:\s*"((?:[^"\\]|\\.)*)"/)
+    if (!urlMatch) return null
+    const targetUrl = JSON.parse(`"${urlMatch[1]}"`)
+
+    const options = extractJsonValue(partial, '"options"')
+    if (!options) return null
+
+    const remaining = extractJsonValue(partial, '"remaining"') ?? []
+    const completedUrls = extractJsonValue(partial, '"completedUrls"') ?? []
+
+    // Overwrite the corrupt/oversized file with a clean slim version so
+    // subsequent resume attempts (and index.js loadResumeState) work normally.
+    const slim = { targetUrl, options, allUrls: [], remaining, completedUrls }
+    await fs.writeFile(resumePath, JSON.stringify(slim, null, 2), "utf8")
+    console.log(`[resume] Recovered corrupt resume-state.json — ${remaining.length} pages remaining`)
+    return slim
+  } catch (err) {
+    console.log(`[resume] Could not recover resume-state.json: ${err.message}`)
+    return null
+  } finally {
+    await fd?.close()
+  }
+}
+
 const MIME = {
   ".html": "text/html; charset=utf-8",
   ".json": "application/json; charset=utf-8",
@@ -72,6 +163,7 @@ export async function serveDashboard({ reportDir, port, defaultOptions = {}, ini
       checkAria: defaultOptions.checkAria ?? true,
       checkFocusOrder: defaultOptions.checkFocusOrder ?? true,
       contrastScreenshots: defaultOptions.contrastScreenshots ?? false,
+      elementScreenshots: defaultOptions.elementScreenshots ?? true,
       failOnCritical: false,
       failOnSerious: false,
       reportDir: root
@@ -157,8 +249,11 @@ export async function serveDashboard({ reportDir, port, defaultOptions = {}, ini
       }
 
       try {
-        const resumeRaw = await fs.readFile(path.join(root, "raw", "resume-state.json"), "utf8")
-        const resumeData = JSON.parse(resumeRaw)
+        const resumeData = await readResumeState(path.join(root, "raw", "resume-state.json"))
+        if (!resumeData?.targetUrl) {
+          sendJson(res, 400, { error: "Resume state is missing or could not be recovered. Please start a new scan." })
+          return
+        }
         await startScan(resumeData.targetUrl, resumeData.options)
         sendJson(res, 202, { status: "resumed", url: resumeData.targetUrl })
       } catch (err) {
