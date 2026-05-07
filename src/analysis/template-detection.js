@@ -1,10 +1,13 @@
 import { detectTemplate } from "../utils/url-utils.js"
 
 export function annotateTemplates(results) {
-  return results.map((page) => ({
-    ...page,
-    template: detectTemplate(page.url)
-  }))
+  return results.map((page) => {
+    const cmsTemplate = page.cms?.templateFile
+    return {
+      ...page,
+      template: cmsTemplate || detectTemplate(page.url)
+    }
+  })
 }
 
 export function buildTemplateSummary(results) {
