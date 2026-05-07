@@ -1,5 +1,25 @@
 const KNOWN_IMPACTS = new Set(["critical", "serious", "moderate", "minor"])
 
+const WCAG_A_TAGS = ["wcag2a", "wcag21a", "wcag22a"]
+const WCAG_AA_TAGS = ["wcag2aa", "wcag21aa", "wcag22aa"]
+const WCAG_AAA_TAGS = ["wcag2aaa", "wcag21aaa", "wcag22aaa"]
+
+/**
+ * Given the wcagSummary produced by buildWcagSummary(), determine the highest
+ * WCAG conformance level the site actually achieves:
+ *   "AAA" — no violations at any level
+ *   "AA"  — no A or AA violations, but has AAA violations
+ *   "A"   — no A violations, but has AA violations
+ *   "None"— has A-level violations (fails the baseline)
+ */
+export function computeComplianceLevel(wcagSummary) {
+  const levels = wcagSummary?.levels || {}
+  if (WCAG_A_TAGS.some((t) => (levels[t] || 0) > 0)) return "None"
+  if (WCAG_AA_TAGS.some((t) => (levels[t] || 0) > 0)) return "A"
+  if (WCAG_AAA_TAGS.some((t) => (levels[t] || 0) > 0)) return "AA"
+  return "AAA"
+}
+
 function newImpactCounter() {
   return { critical: 0, serious: 0, moderate: 0, minor: 0, unknown: 0 }
 }

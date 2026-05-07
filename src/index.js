@@ -5,6 +5,7 @@ import { scanPages } from "./scanner/page-scanner.js"
 import { buildWcagSummary, buildSeveritySummary } from "./analysis/wcag-grouping.js"
 import { buildRuleSummary } from "./analysis/rule-grouping.js"
 import { annotateTemplates, buildTemplateSummary } from "./analysis/template-detection.js"
+import { buildUniqueViolations } from "./analysis/deduplication.js"
 import { generateReports } from "./reporting/generate-reports.js"
 import { createLiveStateTracker } from "./reporting/live-state.js"
 import { createLogger } from "./utils/logger.js"
@@ -146,6 +147,7 @@ export async function runScan(targetUrl, options, signal) {
     checkAria: options.checkAria,
     checkFocusOrder: options.checkFocusOrder,
     contrastScreenshots: options.contrastScreenshots,
+    elementScreenshots: options.elementScreenshots,
     onPageResult: async (pageResult) => {
       scannedUrls.add(pageResult.url)
       newResults.push(pageResult)
@@ -187,6 +189,7 @@ export async function runScan(targetUrl, options, signal) {
   const wcagSummary = buildWcagSummary(resultsWithTemplates)
   const ruleSummary = buildRuleSummary(resultsWithTemplates)
   const templateSummary = buildTemplateSummary(resultsWithTemplates)
+  const uniqueViolations = buildUniqueViolations(resultsWithTemplates)
 
   const summary = {
     targetUrl,
@@ -222,6 +225,7 @@ export async function runScan(targetUrl, options, signal) {
     wcagSummary,
     ruleSummary,
     templateSummary,
+    uniqueViolations,
     logs: logger.logs
   })
 
