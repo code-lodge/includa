@@ -2,7 +2,7 @@ import fs from "node:fs/promises"
 import path from "node:path"
 import { runAxe } from "./axe-runner.js"
 import { BrowserPool } from "./browser-pool.js"
-import { safeSlug } from "../utils/url-utils.js"
+import { safeSlug, detectTemplate } from "../utils/url-utils.js"
 import { detectCms, cmsSignalScript } from "../analysis/cms/index.js"
 
 async function runKeyboardCheck(page) {
@@ -156,6 +156,7 @@ async function scanSinglePage(page, url, options) {
   return {
     url,
     title,
+    template: cms?.templateFile || detectTemplate(url),
     status: "ok",
     scannedAt: new Date().toISOString(),
     durationMs: Date.now() - start,
@@ -181,20 +182,20 @@ export async function scanPages(urls, options, logger, signal) {
   try {
     await pool.init()
 
-    const results = await pool.run(urls, async ({ context, url, index }) => {
-      if (signal?.aborted) return null
+    await pool.run(urls, async ({ context, url, index }) => {
+      if (signal?.aborted) return
       logger.progress("Scanning page", index + 1, urls.length)
       const page = await context.newPage()
       try {
         const result = await scanSinglePage(page, url, options)
         await page.close()
         if (options.onPageResult) await options.onPageResult(result)
-        return result
       } catch (error) {
         await page.close().catch(() => {})
         const failed = {
           url,
           title: "",
+          template: detectTemplate(url),
           status: "error",
           scannedAt: new Date().toISOString(),
           durationMs: 0,
@@ -207,11 +208,8 @@ export async function scanPages(urls, options, logger, signal) {
           error: error.message
         }
         if (options.onPageResult) await options.onPageResult(failed)
-        return failed
       }
     }, signal)
-
-    return results.filter(Boolean)
   } finally {
     await pool.close().catch(() => {})
   }

@@ -1,6 +1,17 @@
 import fs from "node:fs/promises"
+import { createReadStream } from "node:fs"
+import { createInterface } from "node:readline"
 import path from "node:path"
-import { safeSlug, templateFolder, escapeHtml } from "../utils/url-utils.js"
+import { safeSlug, templateFolder, escapeHtml, detectTemplate } from "../utils/url-utils.js"
+
+async function* streamJsonl(filePath) {
+  try {
+    const rl = createInterface({ input: createReadStream(filePath), crlfDelay: Infinity })
+    for await (const line of rl) {
+      if (line.trim()) yield JSON.parse(line)
+    }
+  } catch { /* file missing or empty */ }
+}
 
 const PLATFORM_LABEL = {
   wordpress:   "WordPress",
@@ -230,13 +241,13 @@ function renderPageHtml(page) {
 </html>`
 }
 
-export async function writePageReports(reportDir, pages) {
-  for (const page of pages) {
-    const folder = templateFolder(page.template)
+export async function writePageReports(reportDir, jsonlPath) {
+  for await (const page of streamJsonl(jsonlPath)) {
+    const template = page.template || page.cms?.templateFile || detectTemplate(page.url)
+    const folder = templateFolder(template)
     const outputDir = path.join(reportDir, "pages", folder)
     const filename = `${safeSlug(page.url)}.html`
-
     await fs.mkdir(outputDir, { recursive: true })
-    await fs.writeFile(path.join(outputDir, filename), renderPageHtml(page), "utf8")
+    await fs.writeFile(path.join(outputDir, filename), renderPageHtml({ ...page, template }), "utf8")
   }
 }

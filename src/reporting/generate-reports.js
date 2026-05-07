@@ -12,11 +12,11 @@ export async function generateReports(payload) {
   }
 
   if (payload.formats.has("html")) {
-    await writePageReports(payload.reportDir, payload.pages)
+    await writePageReports(payload.reportDir, payload.jsonlPath)
     await writeRuleReports(payload.reportDir, payload.ruleSummary)
-    await writeTemplateReports(payload.reportDir, payload.templateSummary, payload.pages)
+    await writeTemplateReports(payload.reportDir, payload.templateSummary, payload.pagesByTemplate)
     await writeStaticReport(payload.reportDir, payload)
-    await writeUniqueIssuesReport(payload.reportDir, payload.uniqueViolations, payload.pages.length)
+    await writeUniqueIssuesReport(payload.reportDir, payload.uniqueViolations, payload.pagesLite.length)
     await writeDashboard(payload.reportDir, payload)
   }
 }

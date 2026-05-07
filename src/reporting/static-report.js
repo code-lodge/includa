@@ -64,7 +64,7 @@ function pagePath(page) {
 }
 
 export async function writeStaticReport(reportDir, payload) {
-  const { summary, severitySummary, ruleSummary, templateSummary, pages } = payload
+  const { summary, severitySummary, ruleSummary, templateSummary, pagesLite } = payload
   const uniqueItems = (payload.uniqueViolations && payload.uniqueViolations.uniqueViolations) || null
   const impacts = severitySummary.impacts || {}
   const score = computeScore(uniqueItems, severitySummary)
@@ -79,13 +79,9 @@ export async function writeStaticReport(reportDir, payload) {
     .filter(([, t]) => t.totalViolations > 0)
     .sort((a, b) => b[1].totalViolations - a[1].totalViolations)
 
-  const pagesWithViolations = pages
-    .filter((p) => p.violations && p.violations.length > 0)
-    .sort((a, b) => {
-      const aCount = a.violations.reduce((s, v) => s + Math.max(1, v.nodes.length), 0)
-      const bCount = b.violations.reduce((s, v) => s + Math.max(1, v.nodes.length), 0)
-      return bCount - aCount
-    })
+  const pagesWithViolations = pagesLite
+    .filter((p) => p.violationCount > 0)
+    .sort((a, b) => b.violationCount - a.violationCount)
 
   const uniqueImpacts = {}
   const uniqueTotal = uniqueItems ? uniqueItems.length : null
@@ -133,29 +129,22 @@ export async function writeStaticReport(reportDir, payload) {
   }).join("")
 
   const pageTableRows = pagesWithViolations.map((page) => {
-    const violationCount = page.violations.reduce((s, v) => s + Math.max(1, v.nodes.length), 0)
     const link = `<a href="./${escapeHtml(pagePath(page))}">${escapeHtml(page.url)}</a>`
-    const topImpact = page.violations.reduce((worst, v) => {
-      return (impactOrder[v.impact] ?? 4) < (impactOrder[worst] ?? 4) ? v.impact : worst
-    }, "unknown")
     return `<tr>
       <td>${link}</td>
       <td>${escapeHtml(page.template || "–")}</td>
-      <td><span class="badge badge-${escapeHtml(topImpact)}">${escapeHtml(topImpact)}</span></td>
-      <td class="num">${violationCount}</td>
+      <td><span class="badge badge-${escapeHtml(page.topImpact)}">${escapeHtml(page.topImpact)}</span></td>
+      <td class="num">${page.violationCount}</td>
     </tr>`
   }).join("")
 
-  const allPagesSorted = [...pages].sort((a, b) => a.url.localeCompare(b.url))
+  const allPagesSorted = [...pagesLite].sort((a, b) => a.url.localeCompare(b.url))
   const allPagesTableRows = allPagesSorted.map((page) => {
-    const violationCount = (page.violations || []).reduce((s, v) => s + Math.max(1, v.nodes.length), 0)
-    const passCount = (page.passes || []).length
-    const incompleteCount = (page.incomplete || []).length
     const link = `<a href="./${escapeHtml(pagePath(page))}">${escapeHtml(page.url)}</a>`
     const status = page.status === "error"
       ? '<span class="badge badge-critical">error</span>'
-      : violationCount > 0
-        ? '<span class="badge badge-serious">' + violationCount + ' violations</span>'
+      : page.violationCount > 0
+        ? '<span class="badge badge-serious">' + page.violationCount + ' violations</span>'
         : '<span class="badge" style="background:rgba(34,197,94,0.2);color:#86efac">clean</span>'
     const settled = page.networkSettled === false
       ? ' <span class="muted" title="networkidle was not reached — results may be incomplete">*</span>'
@@ -164,9 +153,9 @@ export async function writeStaticReport(reportDir, payload) {
       <td>${link}${settled}</td>
       <td>${escapeHtml(page.template || "–")}</td>
       <td>${status}</td>
-      <td class="num">${violationCount}</td>
-      <td class="num">${passCount}</td>
-      <td class="num">${incompleteCount}</td>
+      <td class="num">${page.violationCount}</td>
+      <td class="num">${page.passCount}</td>
+      <td class="num">${page.incompleteCount}</td>
     </tr>`
   }).join("")
 
@@ -585,7 +574,7 @@ export async function writeStaticReport(reportDir, payload) {
     </div>` : '<div class="panel-full"><p class="empty">No pages with violations found.</p></div>'}
 
     <div class="panel-full">
-      <h2>All Pages Scanned (${pages.length})</h2>
+      <h2>All Pages Scanned (${pagesLite.length})</h2>
       <p class="muted" style="margin:0 0 0.6rem;font-size:0.82rem">Every page that was scanned, including clean pages. Pages marked with <strong>*</strong> did not reach network-idle and results may be incomplete.</p>
       <input id="allPageSearch" type="search" placeholder="Filter by URL…" aria-label="Filter all scanned pages by URL" />
       <table>

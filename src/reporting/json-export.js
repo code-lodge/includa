@@ -1,5 +1,16 @@
 import fs from "node:fs/promises"
+import { createReadStream, createWriteStream } from "node:fs"
+import { createInterface } from "node:readline"
 import path from "node:path"
+
+async function* streamJsonl(filePath) {
+  try {
+    const rl = createInterface({ input: createReadStream(filePath), crlfDelay: Infinity })
+    for await (const line of rl) {
+      if (line.trim()) yield JSON.parse(line)
+    }
+  } catch { /* file missing or empty */ }
+}
 
 async function writeJson(filePath, payload) {
   await fs.mkdir(path.dirname(filePath), { recursive: true })
@@ -21,7 +32,6 @@ export async function exportJsonAndCsv(reportDir, payload) {
   await writeJson(path.join(summaryDir, "scan-summary.json"), payload.summary)
   await writeJson(path.join(summaryDir, "wcag-summary.json"), payload.wcagSummary)
   await writeJson(path.join(summaryDir, "severity-summary.json"), payload.severitySummary)
-  await writeJson(path.join(rawDir, "results.json"), payload.pages)
   await writeJson(path.join(rawDir, "rules.json"), payload.ruleSummary)
   await writeJson(path.join(rawDir, "templates.json"), payload.templateSummary)
   await writeJson(path.join(rawDir, "scan-logs.json"), payload.logs)
@@ -29,13 +39,25 @@ export async function exportJsonAndCsv(reportDir, payload) {
     await writeJson(path.join(rawDir, "unique-violations.json"), payload.uniqueViolations)
   }
 
-  // CSV: use node counts for both "violations" column and per-severity columns
-  // so the numbers are internally consistent.
+  // Stream results.json from JSONL to avoid buffering all pages in memory
+  await fs.mkdir(rawDir, { recursive: true })
+  const ws = createWriteStream(path.join(rawDir, "results.json"), { encoding: "utf8" })
+  ws.write("[\n")
+  let first = true
+  for await (const page of streamJsonl(payload.jsonlPath)) {
+    if (!first) ws.write(",\n")
+    ws.write(JSON.stringify(page, null, 2))
+    first = false
+  }
+  ws.write("\n]\n")
+  await new Promise((resolve, reject) => { ws.end(resolve); ws.on("error", reject) })
+
+  // CSV: url/title/status/template/counts — small enough to collect in memory
   const rows = [
     ["url", "title", "status", "template", "violations", "critical", "serious", "moderate", "minor"]
   ]
 
-  for (const page of payload.pages) {
+  for await (const page of streamJsonl(payload.jsonlPath)) {
     const impacts = { critical: 0, serious: 0, moderate: 0, minor: 0 }
     let totalNodeCount = 0
 
@@ -61,7 +83,7 @@ export async function exportJsonAndCsv(reportDir, payload) {
   }
 
   // UTF-8 BOM for Excel compatibility
-  const bom = "\uFEFF"
+  const bom = "﻿"
   const csv = bom + rows.map((row) => row.map(escapeCsv).join(",")).join("\n")
   await fs.writeFile(path.join(rawDir, "results.csv"), csv, "utf8")
 }

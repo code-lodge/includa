@@ -134,16 +134,9 @@ function renderTemplatePage(template, pages, metrics) {
 </html>`
 }
 
-export async function writeTemplateReports(reportDir, templateSummary, store) {
+export async function writeTemplateReports(reportDir, templateSummary, pagesByTemplate) {
   const outputDir = path.join(reportDir, "templates")
   await fs.mkdir(outputDir, { recursive: true })
-
-  const pagesByTemplate = {}
-  for (const page of store.iteratePages()) {
-    const t = page.template
-    if (!pagesByTemplate[t]) pagesByTemplate[t] = []
-    pagesByTemplate[t].push({ url: page.url, violationCount: page.violations.length, status: page.status })
-  }
 
   for (const [template, metrics] of Object.entries(templateSummary.templates)) {
     const templatePages = pagesByTemplate[template] || []
