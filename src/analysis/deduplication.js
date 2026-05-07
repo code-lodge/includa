@@ -34,7 +34,8 @@ export function buildUniqueViolations(resultsWithTemplates) {
             occurrences: 0,
             exampleNode: node,
             exampleTemplate: page.template,
-            examplePageUrl: page.url
+            examplePageUrl: page.url,
+            cms: page.cms || null,
           })
         }
 
@@ -67,7 +68,8 @@ export function buildUniqueViolations(resultsWithTemplates) {
     priorityScore: (IMPACT_WEIGHT[entry.impact] ?? 0.5) * entry.occurrences,
     exampleNode: entry.exampleNode,
     exampleTemplate: entry.exampleTemplate,
-    examplePageUrl: entry.examplePageUrl
+    examplePageUrl: entry.examplePageUrl,
+    cms: entry.cms,
   }))
 
   items.sort((a, b) => b.priorityScore - a.priorityScore || b.occurrences - a.occurrences)

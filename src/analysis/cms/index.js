@@ -62,6 +62,8 @@ export function detectCms(signals) {
       label:         tpl?.label         ?? detector.platform,
     }
     if (detector.noEdit) result.noEdit = true
+    if (tpl?.isBlockTheme) result.isBlockTheme = true
+    if (tpl?.templateParts) result.templateParts = tpl.templateParts
     return result
   }
   return null
@@ -90,5 +92,8 @@ export function cmsSignalScript() {
     hasMagento:         !!document.querySelector('script[type="text/x-magento-init"]'),
     hasMagentoCdn:      !!document.querySelector('[src*="/static/version"], [href*="/static/version"]'),
     hasSquarespaceCdn:  !!document.querySelector('[src*="static1.squarespace.com"], [href*="sqspcdn.com"]'),
+    hasWpSiteBlocks:    !!document.querySelector('.wp-site-blocks'),
+    hasGlobalStyles:    !!document.getElementById('global-styles-inline-css'),
+    hasBlockTemplateParts: !!document.querySelector('.wp-block-template-part'),
   }))()`
 }

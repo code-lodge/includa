@@ -3,9 +3,12 @@
  *
  * Template detection works entirely from the body class emitted by
  * WordPress's body_class() filter — no plugin or API required.
+ *
+ * Detects block (FSE) themes via wp-site-blocks / global-styles-inline-css
+ * and adjusts the template hierarchy from .php to templates/*.html + parts/*.html.
  */
 
-// Full WP template hierarchy for each template type, most-specific first.
+// Classic theme hierarchy — PHP files in theme root.
 const HIERARCHY = {
   "front-page": ()  => ["front-page.php", "home.php", "index.php"],
   "home":       ()  => ["home.php", "index.php"],
@@ -165,6 +168,16 @@ function buildLabel(type, slots) {
   }
 }
 
+const BLOCK_TEMPLATE_PARTS = ["parts/header.html", "parts/footer.html"]
+
+function toBlockHierarchy(classicHierarchy) {
+  return classicHierarchy.map(f => "templates/" + f.replace(/\.php$/, ".html"))
+}
+
+function isBlockTheme({ hasWpSiteBlocks, hasGlobalStyles, hasBlockTemplateParts }) {
+  return (hasWpSiteBlocks && hasGlobalStyles) || hasBlockTemplateParts
+}
+
 const WP_BODY_MARKERS = ["wp-singular", "wp-embed-responsive", "error404", "single-post", "page-template-default"]
 
 export default {
@@ -180,7 +193,8 @@ export default {
     return WP_BODY_MARKERS.some(c => classes.includes(c))
   },
 
-  detectTemplate({ bodyClass }) {
+  detectTemplate(signals) {
+    const { bodyClass } = signals
     if (!bodyClass) return null
     const classes = bodyClass.trim().split(/\s+/).filter(Boolean)
     const templateType = resolveTemplateType(classes)
@@ -188,13 +202,18 @@ export default {
 
     const slots = parseSlots(classes)
     const builder = HIERARCHY[templateType]
-    const hierarchy = builder ? builder(slots) : ["index.php"]
+    const classicHierarchy = builder ? builder(slots) : ["index.php"]
+    const block = isBlockTheme(signals)
+
+    const hierarchy = block ? toBlockHierarchy(classicHierarchy) : classicHierarchy
 
     return {
       templateType,
       templateFile: hierarchy[0],
       hierarchy,
       label: buildLabel(templateType, slots),
+      isBlockTheme: block,
+      ...(block && { templateParts: BLOCK_TEMPLATE_PARTS }),
     }
   },
 }

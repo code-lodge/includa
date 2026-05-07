@@ -133,7 +133,14 @@ export async function writeUniqueIssuesReport(reportDir, uniqueViolationsData, t
     templates: item.templates,
     pageCount: item.pageCount,
     occurrences: item.occurrences,
-    examplePageUrl: item.examplePageUrl
+    examplePageUrl: item.examplePageUrl,
+    cms: item.cms ? {
+      platform: item.cms.platform,
+      templateFile: item.cms.templateFile,
+      hierarchy: item.cms.hierarchy,
+      isBlockTheme: item.cms.isBlockTheme || false,
+      templateParts: item.cms.templateParts || [],
+    } : null,
   })))
 
   const promptTemplateOptions = templateNames.map((t) =>
@@ -577,17 +584,44 @@ export async function writeUniqueIssuesReport(reportDir, uniqueViolationsData, t
         groups[sev].push(issues[i])
       }
 
+      var cmsInfo = null
+      for (var c = 0; c < issues.length; c++) {
+        if (issues[c].cms) { cmsInfo = issues[c].cms; break }
+      }
+
       var lines = []
       lines.push('You are an accessibility remediation expert. Your task is to fix the WCAG accessibility violations listed below.')
       lines.push('')
       lines.push('CONTEXT:')
       lines.push('- ' + issues.length + ' unique accessibility violations were found' + (templateName !== '__all__' ? ' in the "' + templateName + '" template' : ' across all templates') + '.')
       lines.push('- These were detected by axe-core during an automated scan.')
+
+      if (cmsInfo) {
+        lines.push('- CMS: WordPress' + (cmsInfo.isBlockTheme ? ' (Block/FSE theme)' : ' (Classic theme)'))
+        if (cmsInfo.templateFile) lines.push('- Active template file: ' + cmsInfo.templateFile)
+        if (cmsInfo.hierarchy && cmsInfo.hierarchy.length > 1) lines.push('- Template hierarchy: ' + cmsInfo.hierarchy.join(' → '))
+        if (cmsInfo.isBlockTheme) {
+          lines.push('- Template parts to check: ' + (cmsInfo.templateParts || []).join(', '))
+          lines.push('- Design tokens are defined in theme.json (colors, typography, spacing)')
+        }
+      }
+
       lines.push('')
       lines.push('INSTRUCTIONS:')
       lines.push('- For each violation, provide the corrected HTML/CSS code.')
       lines.push('- Show before and after code snippets so the developer knows exactly what to change.')
-      lines.push('- If the fix requires changes to a CMS template, identify which template file is likely responsible.')
+
+      if (cmsInfo && cmsInfo.isBlockTheme) {
+        lines.push('- This is a WordPress Block (FSE) theme. Templates are HTML files in templates/ and template parts are in parts/.')
+        lines.push('- Fixes may require editing block markup (<!-- wp:group -->, etc.), theme.json, or custom block code.')
+        lines.push('- For color/contrast issues, check theme.json palette definitions under settings.color.palette.')
+      } else if (cmsInfo) {
+        lines.push('- This is a WordPress Classic theme. Templates are PHP files in the theme root.')
+        lines.push('- If the fix requires changes to a CMS template, identify which template file is likely responsible.')
+      } else {
+        lines.push('- If the fix requires changes to a CMS template, identify which template file is likely responsible.')
+      }
+
       lines.push('- Explain WHY each fix resolves the accessibility issue.')
       lines.push('- Prioritize critical and serious issues first.')
       lines.push('')
@@ -618,6 +652,8 @@ export async function writeUniqueIssuesReport(reportDir, uniqueViolationsData, t
           if (issue.failureSummary) lines.push('   Failure reason: ' + issue.failureSummary)
           lines.push('   Found on: ' + issue.pageCount + ' page' + (issue.pageCount !== 1 ? 's' : '') + ' (' + issue.occurrences + ' total occurrences)')
           if (issue.templates.length > 0) lines.push('   Templates: ' + issue.templates.join(', '))
+          if (issue.cms && issue.cms.templateFile) lines.push('   Template file: ' + issue.cms.templateFile)
+          if (issue.cms && issue.cms.hierarchy && issue.cms.hierarchy.length > 1) lines.push('   Hierarchy: ' + issue.cms.hierarchy.join(' → '))
           if (issue.examplePageUrl) lines.push('   Example page: ' + issue.examplePageUrl)
           if (issue.helpUrl) lines.push('   WCAG docs: ' + issue.helpUrl)
         }
