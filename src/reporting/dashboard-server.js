@@ -142,13 +142,14 @@ export async function serveDashboard({ dataDir, port, defaultOptions = {}, initi
   }
 
   function buildScanOptions(project, overrides = {}) {
-    const merged = { ...defaultOptions, ...(project.options || {}), ...overrides }
+    const { maxPages: _cliMax, ...cliDefaults } = defaultOptions
+    const merged = { ...cliDefaults, ...(project.options || {}), ...overrides }
     const wcagLevel = WCAG_LEVELS.has(merged.wcagLevel) ? merged.wcagLevel : "AAA"
     return {
       format: merged.format || "html,json,csv",
       locale: merged.locale || "en",
       wcagLevel,
-      maxPages: Number(merged.maxPages ?? 2000),
+      maxPages: Number(merged.maxPages ?? Infinity),
       concurrency: Number(merged.concurrency ?? 10),
       depth: Number(merged.depth ?? 6),
       sampleTemplates: Number(merged.sampleTemplates ?? 0),

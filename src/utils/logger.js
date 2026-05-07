@@ -25,6 +25,6 @@ export function createLogger() {
     warn: (message) => push("warn", message),
     error: (message) => push("error", message),
     success: (message) => push("success", message),
-    progress: (label, current, total) => push("info", `${label} ${current}/${total}`)
+    progress: (label, current, total) => push("info", `${label} ${current}${Number.isFinite(total) ? `/${total}` : ""}`)
   }
 }
