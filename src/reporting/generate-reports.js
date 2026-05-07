@@ -4,6 +4,7 @@ import { writePageReports } from "./page-report.js"
 import { writeRuleReports } from "./rule-report.js"
 import { writeTemplateReports } from "./template-report.js"
 import { writeStaticReport } from "./static-report.js"
+import { writeUniqueIssuesReport } from "./unique-issues-report.js"
 
 export async function generateReports(payload) {
   if (payload.formats.has("json") || payload.formats.has("csv")) {
@@ -15,6 +16,7 @@ export async function generateReports(payload) {
     await writeRuleReports(payload.reportDir, payload.ruleSummary)
     await writeTemplateReports(payload.reportDir, payload.templateSummary, payload.pages)
     await writeStaticReport(payload.reportDir, payload)
+    await writeUniqueIssuesReport(payload.reportDir, payload.uniqueViolations, payload.pages.length)
     await writeDashboard(payload.reportDir, payload)
   }
 }
