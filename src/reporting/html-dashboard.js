@@ -1305,11 +1305,11 @@ const DASHBOARD_HTML = `<!doctype html>
         }
 
         var reportLinksEl = document.getElementById('reportLinks')
-        if (data.scannedPages > 0) {
-          reportLinksEl.style.display = 'flex'
-        }
         if (data.status === 'completed') {
+          reportLinksEl.style.display = 'flex'
           document.getElementById('viewReportBtn').style.display = 'inline-block'
+        } else {
+          reportLinksEl.style.display = 'none'
         }
 
         renderBars(document.getElementById('resultTypeBars'), {
