@@ -123,6 +123,9 @@ jobs:
           draft: true
           generate_release_notes: true
           fail_on_unmatched_files: true
+          # Replace any same-named asset already attached (e.g. when re-pushing
+          # a moved tag to retrigger the build with bug fixes).
+          clobber: true
           body: |
             ## Downloads
 
