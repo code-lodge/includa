@@ -95,7 +95,6 @@ jobs:
             dist/*.msi
             dist/*.dmg
             dist/*.AppImage
-            dist/*.zip
             dist/latest*.yml
 
   release:
@@ -145,7 +144,6 @@ jobs:
             artifacts/*.msi
             artifacts/*.dmg
             artifacts/*.AppImage
-            artifacts/*.zip
             artifacts/latest*.yml
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
