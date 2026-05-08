@@ -14,6 +14,11 @@ on:
 permissions:
   contents: write
 
+# Run JS-based actions on Node 24 — silences the Node 20 deprecation warnings
+# that GitHub will start enforcing in mid-2026.
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: 'true'
+
 # Only one release run per ref at a time. Cancel older queued/active runs.
 concurrency:
   group: release-${{ github.ref }}

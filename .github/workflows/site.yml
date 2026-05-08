@@ -13,6 +13,11 @@ permissions:
   pages: write
   id-token: write
 
+# Run JS-based actions on Node 24 — silences the Node 20 deprecation warnings
+# that GitHub will start enforcing in mid-2026.
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: 'true'
+
 # Only one deployment at a time. Don't cancel an in-flight production deploy.
 concurrency:
   group: pages
