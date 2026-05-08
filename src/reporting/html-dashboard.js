@@ -539,8 +539,8 @@ const DASHBOARD_HTML = `<!doctype html>
     </details>
 
     <section class="top-grid">
-      <article class="stat"><div class="label">WCAG Level (Scanned)</div><div id="wcagLevel" class="value">AAA</div></article>
-      <article class="stat"><div class="label">Compliance Achieved</div><div id="complianceLevel" class="value">–</div></article>
+      <article class="stat" title="WCAG conformance level the scan tested against. Not a compliance result."><div class="label">Tested at</div><div id="wcagLevel" class="value">AAA</div></article>
+      <article class="stat" title="Binary WCAG result from automated checks. Manual review still required for full conformance."><div class="label">WCAG Compliance</div><div id="complianceLevel" class="value">–</div></article>
       <article class="stat"><div class="label">Discovered Pages</div><div id="discoveredPages" class="value">0</div></article>
       <article class="stat"><div class="label">Scanned Pages</div><div id="scannedPages" class="value">0</div></article>
       <article class="stat"><div class="label">Violations</div><div id="totalViolations" class="value" style="color: var(--critical)">0</div><div id="uniqueViolations" class="sub-label">0 unique rules</div></article>
@@ -1248,13 +1248,20 @@ const DASHBOARD_HTML = `<!doctype html>
         document.getElementById('scanStatus').textContent = data.statusMessage || 'Running'
         document.getElementById('wcagLevel').textContent = data.wcagLevel || 'AAA'
         const wv = data.wcagViolations
-        const COMPLIANCE_COLOR = { AAA: '#22c55e', AA: '#22c55e', A: '#fb923c', None: '#ef4444' }
-        const COMPLIANCE_LABEL = { AAA: 'WCAG AAA', AA: 'WCAG AA', A: 'WCAG A', None: 'Fails WCAG A' }
+        const totalV = data.totalViolations || 0
         const complianceEl = document.getElementById('complianceLevel')
         if (wv && typeof wv.a === 'number') {
-          const lvl = wv.a > 0 ? 'None' : wv.aa > 0 ? 'A' : wv.aaa > 0 ? 'AA' : 'AAA'
-          complianceEl.textContent = COMPLIANCE_LABEL[lvl]
-          complianceEl.style.color = COMPLIANCE_COLOR[lvl] || ''
+          var lbl, col
+          if (wv.a > 0) { lbl = 'Fails WCAG A'; col = '#ef4444' }
+          else if (wv.aa > 0) { lbl = 'Fails WCAG AA'; col = '#ef4444' }
+          else if (wv.aaa > 0) { lbl = 'Fails WCAG AAA'; col = '#fb923c' }
+          else if (totalV > 0) { lbl = 'Passes WCAG AAA*'; col = '#fb923c' }
+          else { lbl = 'Passes WCAG AAA'; col = '#22c55e' }
+          complianceEl.textContent = lbl
+          complianceEl.style.color = col
+          complianceEl.title = totalV > 0 && wv.a === 0 && wv.aa === 0 && wv.aaa === 0
+            ? 'Best-practice (non-WCAG) issues remain. Manual review required for full conformance.'
+            : 'Automated tests only. Manual review required for full conformance.'
         } else {
           complianceEl.textContent = '–'
           complianceEl.style.color = ''

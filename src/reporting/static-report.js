@@ -48,6 +48,15 @@ function pagePath(page) {
   return `pages/${folder}/${safeSlug(page.url)}.html`
 }
 
+function complianceFromWcag(wv, totalViolations) {
+  if (!wv) return null
+  if (wv.a > 0) return { level: "Fails WCAG A", color: "#ef4444", detail: `${wv.a} Level A violation${wv.a !== 1 ? "s" : ""}` }
+  if (wv.aa > 0) return { level: "Fails WCAG AA", color: "#ef4444", detail: `${wv.aa} Level AA violation${wv.aa !== 1 ? "s" : ""}` }
+  if (wv.aaa > 0) return { level: "Fails WCAG AAA", color: "#fb923c", detail: `${wv.aaa} Level AAA violation${wv.aaa !== 1 ? "s" : ""}` }
+  if (totalViolations > 0) return { level: "Passes WCAG AAA*", color: "#fb923c", detail: "Best-practice issues remain — manual review required" }
+  return { level: "Passes WCAG AAA", color: "#22c55e", detail: "No automated violations — manual review still required" }
+}
+
 export async function writeStaticReport(reportDir, payload) {
   const { summary, severitySummary, ruleSummary, templateSummary, pagesLite } = payload
   const uniqueItems = (payload.uniqueViolations && payload.uniqueViolations.uniqueViolations) || null
@@ -56,6 +65,7 @@ export async function writeStaticReport(reportDir, payload) {
   const score = typeof scoreSummary.score === "number" ? scoreSummary.score : 100
   const color = scoreColor(score)
   const label = scoreLabel(score)
+  const compliance = complianceFromWcag(payload.wcagViolations, severitySummary.totalViolations || 0)
 
   const impactOrder = IMPACT_ORDER
   const violationRules = Object.values(ruleSummary.rules)
@@ -422,10 +432,11 @@ export async function writeStaticReport(reportDir, payload) {
       <div class="hero-meta">
         <h1>Accessibility Report</h1>
         <p><strong>URL:</strong> ${escapeHtml(targetUrl)}</p>
-        <p><strong>WCAG Level:</strong> ${escapeHtml(wcagLevel)}</p>
+        <p><strong>Tested at:</strong> WCAG ${escapeHtml(wcagLevel)} <span style="color:var(--muted);font-size:0.85em">(audit coverage, not a compliance claim)</span></p>
+        ${compliance ? `<p><strong>Compliance:</strong> <span style="color:${compliance.color};font-weight:600">${escapeHtml(compliance.level)}</span> <span style="color:var(--muted);font-size:0.85em">— ${escapeHtml(compliance.detail)}</span></p>` : ""}
         <p><strong>Scanned:</strong> ${escapeHtml(formatDate(summary.startedAt))} → ${escapeHtml(formatDate(summary.finishedAt))}</p>
         ${summary.totalViolations === 0
-          ? '<p style="color:#22c55e;font-weight:600;margin-top:0.5rem">No violations found — great job!</p>'
+          ? '<p style="color:#22c55e;font-weight:600;margin-top:0.5rem">No automated violations — great start! Manual review still required for full conformance.</p>'
           : `<p style="color:#9fb4c3;margin-top:0.5rem">Below are the issues that need to be fixed to improve accessibility.</p>`}
       </div>
       <div>
