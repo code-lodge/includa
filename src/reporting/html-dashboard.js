@@ -1415,9 +1415,10 @@ export async function writeDashboard(reportDir, opts = {}) {
   await fs.mkdir(reportDir, { recursive: true })
 
   const base = projectId ? `/api/projects/${projectId}` : "/api"
-  const backLink = projectId
-    ? `<a href="/" style="padding:0.35rem 0.85rem;border-radius:999px;background:rgba(45,212,191,0.12);color:var(--accent);font-size:0.84rem;text-decoration:none;border:1px solid rgba(45,212,191,0.3)">← All Projects</a>`
-    : ""
+  // No back-link: the dashboard opens in its own window from the projects
+  // home (target=_blank), so a "back to all projects" link would just open
+  // a duplicate Projects window without closing this one.
+  const backLink = ""
   const reportDirStyle = projectId ? `style="display:none"` : ""
 
   const html = DASHBOARD_HTML
