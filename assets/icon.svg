@@ -15,33 +15,22 @@
     </linearGradient>
   </defs>
 
-  <!-- Rounded background with iOS-style corners -->
+  <!-- Rounded background — iOS-style 22% corner radius -->
   <rect x="0" y="0" width="1024" height="1024" rx="232" ry="232" fill="url(#bg-grad)"/>
   <rect x="0" y="0" width="1024" height="1024" rx="232" ry="232" fill="url(#highlight)"/>
 
-  <!-- Stylised "i" + "n" letterforms drawn as paths so the icon renders identically
-       without depending on which webfonts the renderer happens to have installed. -->
+  <!-- Universal accessibility figure: person with arms outstretched.
+       Head + horizontal arms (with rounded ends) + body trunk extending
+       below. Public-domain symbol convention used by iOS/macOS Accessibility
+       settings and ISO 7001 PI PF 011. -->
   <g fill="url(#ink)">
-    <!-- "i" stem -->
-    <rect x="278" y="402" width="92" height="354" rx="46" ry="46"/>
-    <!-- "i" dot -->
-    <circle cx="324" cy="312" r="56"/>
+    <!-- Head -->
+    <circle cx="512" cy="288" r="78"/>
 
-    <!-- "n" — vertical stem on left, arch on right. Drawn as a single closed path. -->
-    <path d="
-      M 478 756
-      L 478 402
-      L 570 402
-      L 570 458
-      C 600 415, 642 392, 690 392
-      C 770 392, 818 442, 818 532
-      L 818 756
-      L 726 756
-      L 726 552
-      C 726 504, 706 478, 666 478
-      C 618 478, 570 510, 570 580
-      L 570 756
-      Z
-    "/>
+    <!-- Arms — horizontal bar at shoulder height, rounded ends -->
+    <rect x="208" y="402" width="608" height="84" rx="42" ry="42"/>
+
+    <!-- Trunk — vertical bar from below the shoulders down -->
+    <rect x="464" y="486" width="96" height="280" rx="48" ry="48"/>
   </g>
 </svg>

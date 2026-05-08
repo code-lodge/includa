@@ -25,12 +25,19 @@ async function findAvailablePort(start = 4175, range = 25) {
 }
 
 async function bootstrap() {
+  // Window-runtime icon: required for Linux + dev-mode Windows/macOS (where the
+  // exe-embedded .ico / .app-bundle .icns aren't applicable). PNG works on all
+  // three platforms; the packaged .ico/.icns continue to win on Windows/macOS
+  // for the launcher / dock icon.
+  const iconPath = path.join(__dirname, "build", "icon.png")
+
   mainWindow = new BrowserWindow({
     width: 1400,
     height: 900,
     minWidth: 900,
     minHeight: 600,
     title: "Includa",
+    icon: iconPath,
     backgroundColor: "#0f1117",
     autoHideMenuBar: true,
     show: false,
@@ -94,6 +101,12 @@ app.on("web-contents-created", (_, contents) => {
 })
 
 app.whenReady().then(() => {
+  // Windows taskbar grouping: without this, the running app isn't recognised
+  // as the same identity as the pinned/installed shortcut, so the correct icon
+  // doesn't always stick. Must match build.appId in package.json.
+  if (process.platform === "win32") {
+    app.setAppUserModelId("com.code-lodge.includa")
+  }
   configureMenu()
   return bootstrap()
 }).catch((err) => {
