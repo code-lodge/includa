@@ -1,3 +1,5 @@
+import { faviconLink } from "../utils/favicon.js"
+
 export function renderProjectsHome(projects) {
   const cards = projects.map((p) => renderCardHtml(p)).join("\n")
 
@@ -7,6 +9,7 @@ export function renderProjectsHome(projects) {
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Includa — Projects</title>
+${faviconLink()}
 <style>
 :root {
   --bg: #0f1117;

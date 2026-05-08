@@ -65,16 +65,19 @@
     <circle cx="1180" cy="320" r="4"/>
   </g>
 
-  <!-- Logo mark (square icon) — universal accessibility figure -->
+  <!-- Logo mark (square icon) — universal accessibility figure with legs -->
   <g transform="translate(80, 120)">
     <rect width="160" height="160" rx="36" ry="36" fill="url(#logo-grad)"/>
-    <g fill="#02151b" transform="scale(0.156)">
+    <g fill="#02151b" stroke="#02151b" stroke-linecap="round" stroke-linejoin="round" transform="scale(0.156)">
       <!-- Head -->
-      <circle cx="512" cy="288" r="78"/>
-      <!-- Arms — horizontal bar at shoulder height, rounded ends -->
-      <rect x="208" y="402" width="608" height="84" rx="42" ry="42"/>
-      <!-- Trunk — vertical bar from below the shoulders down -->
-      <rect x="464" y="486" width="96" height="280" rx="48" ry="48"/>
+      <circle cx="512" cy="240" r="78"/>
+      <!-- Arms -->
+      <rect x="184" y="358" width="656" height="84" rx="42" ry="42"/>
+      <!-- Body trunk -->
+      <rect x="468" y="442" width="88" height="200" rx="44" ry="44"/>
+      <!-- Legs in a V -->
+      <line x1="512" y1="630" x2="372" y2="852" stroke-width="84"/>
+      <line x1="512" y1="630" x2="652" y2="852" stroke-width="84"/>
     </g>
   </g>
 

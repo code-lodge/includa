@@ -1,5 +1,6 @@
 import fs from "node:fs/promises"
 import path from "node:path"
+import { faviconLink } from "../utils/favicon.js"
 
 const DASHBOARD_HTML = `<!doctype html>
 <html lang="en">
@@ -7,6 +8,7 @@ const DASHBOARD_HTML = `<!doctype html>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>Includa dashboard</title>
+  __FAVICON_LINK__
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=Space+Grotesk:wght@500;700&display=swap" rel="stylesheet">
@@ -1428,6 +1430,7 @@ export async function writeDashboard(reportDir, opts = {}) {
     .replace("'__PROJECT_URL__'", projectUrl ? `'${projectUrl.replace(/'/g, "\\'")}'` : "''")
     .replace("<!-- BACK_LINK -->", backLink)
     .replace("__REPORT_DIR_STYLE__", reportDirStyle)
+    .replace("__FAVICON_LINK__", faviconLink())
 
   await fs.writeFile(path.join(reportDir, "index.html"), html, "utf8")
 }

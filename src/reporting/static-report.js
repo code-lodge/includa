@@ -1,6 +1,7 @@
 import fs from "node:fs/promises"
 import path from "node:path"
 import { escapeHtml, safeSlug, templateFolder } from "../utils/url-utils.js"
+import { faviconLink } from "../utils/favicon.js"
 
 // Lighthouse-style score: weighted % of axe rules that passed across the scan.
 // scoreSummary is computed in src/index.js and passed in via the payload.
@@ -161,6 +162,7 @@ export async function writeStaticReport(reportDir, payload) {
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>Includa Report — ${escapeHtml(targetUrl)}</title>
+  ${faviconLink()}
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=Space+Grotesk:wght@500;700&display=swap" rel="stylesheet">

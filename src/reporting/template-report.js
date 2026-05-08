@@ -1,6 +1,7 @@
 import fs from "node:fs/promises"
 import path from "node:path"
 import { safeSlug, templateFolder, escapeHtml } from "../utils/url-utils.js"
+import { faviconLink } from "../utils/favicon.js"
 
 function renderTemplatePage(template, pages, metrics) {
   const rows = pages.map((page) => `
@@ -17,6 +18,7 @@ function renderTemplatePage(template, pages, metrics) {
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>${escapeHtml(template)} template report</title>
+  ${faviconLink()}
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=Space+Grotesk:wght@500;700&display=swap" rel="stylesheet">
