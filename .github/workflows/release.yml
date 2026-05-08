@@ -125,7 +125,7 @@ jobs:
           fail_on_unmatched_files: true
           # Replace any same-named asset already attached (e.g. when re-pushing
           # a moved tag to retrigger the build with bug fixes).
-          clobber: true
+          overwrite_files: true
           body: |
             ## Downloads
 
