@@ -25,7 +25,7 @@ Most a11y tools test one URL at a time. They tell you the homepage has 12 issues
 A scan of a typical mid-size storefront produces hundreds of raw violations. Includa fingerprints them by rule + normalized selector, so the same broken pattern on 200 pages collapses into a single entry. You go from "fix 1,200 violations" to "fix 8 root causes," with the affected page count next to each.
 
 <div align="center">
-  <img src="site/images/live-dashboard.png" alt="Includa live dashboard showing a completed scan with 39 pages, 479 violations, score 52/100, and a Fails WCAG A compliance badge" width="100%" />
+  <img src="site/images/live-dashboard.png" alt="Includa live dashboard showing a completed scan with 12,261 pages, 2,503 violations, score 73/100, and a Fails WCAG A compliance badge" width="100%" />
   <p align="center"><sub>The live dashboard during a completed scan</sub></p>
 </div>
 
@@ -147,12 +147,12 @@ report/
     <td width="50%" valign="top">
       <strong>Unique Issues view</strong><br />
       <sub>Deduplicated, sortable, filterable by impact and template. Each issue ships with an AI Fix Prompt.</sub><br /><br />
-      <img src="site/images/unique-issues.png" alt="Unique Issues report listing 174 distinct accessibility problems deduplicated across 39 pages" />
+      <img src="site/images/unique-issues.png" alt="Unique Issues report listing 9 distinct accessibility problems deduplicated across 12,261 pages" />
     </td>
     <td width="50%" valign="top">
       <strong>Static report</strong><br />
       <sub>One-page summary suitable for sharing with stakeholders. Score, compliance, severity breakdown, drilldowns.</sub><br /><br />
-      <img src="site/images/static-report.png" alt="Accessibility report static page showing score 52/100, Fails WCAG A compliance, severity breakdown, and per-template violation counts" />
+      <img src="site/images/static-report.png" alt="Accessibility report static page showing score 73/100, Fails WCAG A compliance, severity breakdown, and per-template violation counts" />
     </td>
   </tr>
 </table>

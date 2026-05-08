@@ -17,8 +17,8 @@ const DATA_DIR = path.join(projectRoot, "a11y-projects")
 const OUT_DIR = path.join(projectRoot, "site", "images")
 const VIEWPORT = { width: 1440, height: 900 }
 
-// CytoLED — biggest scan, most striking numbers (479 violations / 39 pages).
-const TARGET_PROJECT_ID = "965df3002d04"
+// Scenery en Zo — Shopify storefront with 2,503 violations across 12,261 pages.
+const TARGET_PROJECT_ID = "034b6db613be"
 
 async function shoot(page, url, file, opts = {}) {
   console.log(`  → ${file}`)
@@ -45,7 +45,7 @@ async function main() {
     // 1. Projects home — multi-project list with stats
     await shoot(page, `http://127.0.0.1:${PORT}/`, "projects-home.png")
 
-    // 2. Live dashboard for the CytoLED scan (completed)
+    // 2. Live dashboard for the completed Scenery en Zo scan
     await shoot(page, `http://127.0.0.1:${PORT}/projects/${TARGET_PROJECT_ID}/`, "live-dashboard.png", { settleMs: 2500 })
 
     // 3. Unique issues — capture viewport (the full page is huge, just grab the top)
