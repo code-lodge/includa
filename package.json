@@ -3,6 +3,10 @@
   "version": "1.0.0",
   "description": "Open-source accessibility scanner for large websites — WCAG 2.0/2.1/2.2 A/AA/AAA with Playwright + axe-core",
   "license": "GPL-3.0-only",
+  "author": {
+    "name": "Code Lodge",
+    "url": "https://includa.app"
+  },
   "type": "module",
   "main": "electron/main.js",
   "engines": {
@@ -107,7 +111,7 @@
     },
     "nsis": {
       "oneClick": false,
-      "allowToChangeInstallationDir": true,
+      "allowToChangeInstallationDirectory": true,
       "perMachine": false
     },
     "mac": {
