@@ -1,5 +1,5 @@
 import fs from "node:fs"
-import { spawnSync } from "node:child_process"
+import { spawn, spawnSync } from "node:child_process"
 import { chromium } from "playwright"
 
 function isBrowserInstalled() {
@@ -10,6 +10,7 @@ function isBrowserInstalled() {
   }
 }
 
+// Synchronous version used by the CLI — keeps a tidy single-process flow.
 export function ensureBrowsers() {
   if (isBrowserInstalled()) return
 
@@ -28,4 +29,21 @@ export function ensureBrowsers() {
   }
 
   console.log("\nChromium installed. Continuing...\n")
+}
+
+// Async version for embedded hosts (Electron) — never blocks the event loop
+// and pipes installer output to a progress callback so the splash screen can
+// surface what's happening.
+export function ensureBrowsersAsync(onProgress) {
+  return new Promise((resolve, reject) => {
+    if (isBrowserInstalled()) return resolve(false)
+    const child = spawn("npx", ["playwright", "install", "chromium"], { shell: true })
+    child.stdout.on("data", (chunk) => { try { onProgress?.(chunk.toString()) } catch {} })
+    child.stderr.on("data", (chunk) => { try { onProgress?.(chunk.toString()) } catch {} })
+    child.once("error", reject)
+    child.once("exit", (code) => {
+      if (code === 0) resolve(true)
+      else reject(new Error(`Playwright install exited with code ${code}`))
+    })
+  })
 }

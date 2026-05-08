@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>a11y-scan</title>
+<style>
+  :root {
+    --bg: #0f1117;
+    --panel: #1a1d27;
+    --border: #2a2d3a;
+    --accent: #2dd4bf;
+    --text: #e2e8f0;
+    --muted: #8892a4;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; height: 100%; background: var(--bg); color: var(--text); font-family: system-ui, -apple-system, sans-serif; }
+  body { display: flex; align-items: center; justify-content: center; }
+  .splash { width: 460px; max-width: 90vw; text-align: center; padding: 2rem; }
+  h1 { margin: 0 0 0.4rem; font-size: 1.6rem; font-weight: 600; }
+  .subtitle { color: var(--muted); font-size: 0.9rem; margin-bottom: 2rem; }
+  .spinner {
+    width: 36px; height: 36px; margin: 0 auto 1.5rem;
+    border: 3px solid var(--border); border-top-color: var(--accent);
+    border-radius: 50%; animation: spin 0.8s linear infinite;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .status { font-size: 0.95rem; color: var(--text); margin-bottom: 0.5rem; min-height: 1.4em; }
+  .detail { font-size: 0.8rem; color: var(--muted); min-height: 1.2em; }
+  .log {
+    margin-top: 1.5rem;
+    text-align: left;
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 0.5rem;
+    padding: 0.75rem;
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-size: 0.72rem;
+    color: var(--muted);
+    max-height: 140px;
+    overflow: auto;
+    display: none;
+  }
+  .log.visible { display: block; }
+  .log-line { white-space: pre-wrap; word-break: break-word; line-height: 1.45; }
+</style>
+</head>
+<body>
+<div class="splash">
+  <div class="spinner" aria-hidden="true"></div>
+  <h1>a11y-scan</h1>
+  <div class="subtitle">Accessibility scanner for large websites</div>
+  <div class="status" id="status">Starting…</div>
+  <div class="detail" id="detail">Preparing the dashboard server</div>
+  <div class="log" id="log" aria-live="polite"></div>
+</div>
+<script>
+  var statusEl = document.getElementById('status')
+  var detailEl = document.getElementById('detail')
+  var logEl = document.getElementById('log')
+  var sawSetup = false
+
+  function appendLog(line) {
+    if (!sawSetup) {
+      sawSetup = true
+      statusEl.textContent = 'First-time setup'
+      detailEl.textContent = 'Downloading the Chromium browser engine. This only happens once and may take a couple of minutes.'
+      logEl.classList.add('visible')
+    }
+    line.split(/\r?\n/).forEach(function(part) {
+      var trimmed = part.trim()
+      if (!trimmed) return
+      var div = document.createElement('div')
+      div.className = 'log-line'
+      div.textContent = trimmed
+      logEl.appendChild(div)
+      logEl.scrollTop = logEl.scrollHeight
+    })
+  }
+
+  if (window.a11yScanSetup && typeof window.a11yScanSetup.onLog === 'function') {
+    window.a11yScanSetup.onLog(appendLog)
+  }
+</script>
+</body>
+</html>

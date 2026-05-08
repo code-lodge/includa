@@ -4,6 +4,7 @@
   "description": "Open-source accessibility scanner for large websites — WCAG 2.0/2.1/2.2 A/AA/AAA with Playwright + axe-core",
   "license": "GPL-3.0-only",
   "type": "module",
+  "main": "electron/main.js",
   "engines": {
     "node": ">=18.0.0"
   },
@@ -27,6 +28,7 @@
   "files": [
     "bin/",
     "src/",
+    "electron/",
     "LICENSE",
     "README.md"
   ],
@@ -34,7 +36,13 @@
     "a11y-scan": "./bin/a11y-scan.js"
   },
   "scripts": {
-    "scan": "node ./bin/a11y-scan.js"
+    "scan": "node ./bin/a11y-scan.js",
+    "start": "electron .",
+    "electron:dev": "electron .",
+    "build": "electron-builder",
+    "build:win": "electron-builder --win",
+    "build:mac": "electron-builder --mac",
+    "build:linux": "electron-builder --linux"
   },
   "dependencies": {
     "@axe-core/playwright": "^4.8.0",
@@ -44,5 +52,78 @@
     "commander": "^11.0.0",
     "playwright": "^1.43.0",
     "xml2js": "^0.6.2"
+  },
+  "devDependencies": {
+    "electron": "^32.3.3",
+    "electron-builder": "^24.13.3"
+  },
+  "build": {
+    "appId": "com.anomalyco.a11y-scan",
+    "productName": "a11y-scan",
+    "asar": true,
+    "asarUnpack": [
+      "node_modules/playwright-core/**/*",
+      "node_modules/playwright/**/*"
+    ],
+    "files": [
+      "electron/**/*",
+      "src/**/*",
+      "bin/**/*",
+      "package.json",
+      "LICENSE",
+      "README.md",
+      "!**/*.map",
+      "!a11y-projects/**",
+      "!.claude/**",
+      "!test-*/**"
+    ],
+    "directories": {
+      "buildResources": "electron/build",
+      "output": "dist"
+    },
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        },
+        {
+          "target": "portable",
+          "arch": [
+            "x64"
+          ]
+        }
+      ]
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDir": true,
+      "perMachine": false
+    },
+    "mac": {
+      "target": [
+        {
+          "target": "dmg",
+          "arch": [
+            "x64",
+            "arm64"
+          ]
+        }
+      ],
+      "category": "public.app-category.developer-tools"
+    },
+    "linux": {
+      "target": [
+        {
+          "target": "AppImage",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "category": "Development"
+    }
   }
 }
