@@ -1,6 +1,6 @@
 {
   "name": "includa",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Open-source accessibility scanner for large websites — WCAG 2.0/2.1/2.2 A/AA/AAA with Playwright + axe-core",
   "license": "GPL-3.0-only",
   "author": {
