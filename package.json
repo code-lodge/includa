@@ -1,5 +1,5 @@
 {
-  "name": "a11y-scan",
+  "name": "includa",
   "version": "1.0.0",
   "description": "Open-source accessibility scanner for large websites — WCAG 2.0/2.1/2.2 A/AA/AAA with Playwright + axe-core",
   "license": "GPL-3.0-only",
@@ -22,9 +22,9 @@
   ],
   "repository": {
     "type": "git",
-    "url": "https://github.com/anomalyco/a11y-scan.git"
+    "url": "https://github.com/anomalyco/includa.git"
   },
-  "homepage": "https://github.com/anomalyco/a11y-scan#readme",
+  "homepage": "https://github.com/anomalyco/includa#readme",
   "files": [
     "bin/",
     "src/",
@@ -33,10 +33,10 @@
     "README.md"
   ],
   "bin": {
-    "a11y-scan": "./bin/a11y-scan.js"
+    "includa": "./bin/includa.js"
   },
   "scripts": {
-    "scan": "node ./bin/a11y-scan.js",
+    "scan": "node ./bin/includa.js",
     "start": "electron .",
     "electron:dev": "electron .",
     "build": "electron-builder",
@@ -58,8 +58,8 @@
     "electron-builder": "^24.13.3"
   },
   "build": {
-    "appId": "com.anomalyco.a11y-scan",
-    "productName": "a11y-scan",
+    "appId": "com.anomalyco.includa",
+    "productName": "Includa",
     "asar": true,
     "npmRebuild": false,
     "asarUnpack": [

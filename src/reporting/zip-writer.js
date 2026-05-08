@@ -1,5 +1,5 @@
 // Minimal streaming ZIP writer (no external deps).
-// Supports stored + deflate; UTF-8 filenames; not zip64. Sufficient for a11y-scan exports.
+// Supports stored + deflate; UTF-8 filenames; not zip64. Sufficient for includa exports.
 
 import zlib from "node:zlib"
 import { promisify } from "node:util"

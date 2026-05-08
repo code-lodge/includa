@@ -1,4 +1,4 @@
-# a11y-scan
+# Includa
 
 Open-source accessibility scanner for large websites. Crawls your site with Playwright, detects WCAG 2.0/2.1/2.2 violations with axe-core, deduplicates issues across pages, and generates actionable HTML dashboards, static reports, JSON, and CSV.
 
@@ -36,20 +36,20 @@ npx playwright install chromium
 
 ```bash
 # Basic scan
-node bin/a11y-scan.js https://example.com
+node bin/includa.js https://example.com
 
 # Full scan with options
-node bin/a11y-scan.js https://site.com \
+node bin/includa.js https://site.com \
   --concurrency 10 \
   --max-pages 2000 \
   --exclude cart checkout account \
   --report-dir ./a11y-report
 
 # Start the live dashboard (scan + serve)
-node bin/a11y-scan.js https://example.com --dashboard
+node bin/includa.js https://example.com --dashboard
 
 # Serve an existing report without scanning
-node bin/a11y-scan.js --dashboard --report-dir ./a11y-report --port 4173
+node bin/includa.js --dashboard --report-dir ./a11y-report --port 4173
 ```
 
 With `--dashboard`, the web UI starts first and streams scan progress in real time. You can stop, resume, and start new scans from the dashboard UI.
@@ -87,13 +87,13 @@ With `--dashboard`, the web UI starts first and streams scan progress in real ti
 
 ```bash
 # Exclude by substring
-a11y-scan https://site.com --exclude cart checkout
+includa https://site.com --exclude cart checkout
 
 # Exclude by regex
-a11y-scan https://site.com --exclude "re:^https://site\\.com/(cart|account)"
+includa https://site.com --exclude "re:^https://site\\.com/(cart|account)"
 
 # Include only product pages
-a11y-scan https://site.com --include "re:/products/"
+includa https://site.com --include "re:/products/"
 ```
 
 ## Exit Codes
@@ -156,7 +156,7 @@ Includes an **AI Fix Prompts** section — select a template from the dropdown t
 ```
 bin/
   cli.js                — CLI parsing (commander)
-  a11y-scan.js          — Entry point
+  includa.js          — Entry point
 
 src/
   index.js              — runScan() orchestrator

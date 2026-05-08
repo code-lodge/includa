@@ -29,8 +29,8 @@ function normalizeWcagLevel(value) {
 const program = new Command()
 
 program
-  .name("a11y-scan")
-  .description("Large-scale accessibility scanner powered by Playwright + axe-core")
+  .name("includa")
+  .description("Includa — large-scale accessibility scanner powered by Playwright + axe-core")
   .argument("[url]", "target URL (required for CLI, optional for dashboard mode)")
   .option("--max-pages <number>", "maximum pages to scan", (v) => parseNumber(v, 2000), 2000)
   .option("--concurrency <number>", "parallel page scans", (v) => parseNumber(v, 10), 10)
@@ -75,8 +75,8 @@ program
 
     if (!url) {
       console.error("Error: Provide a URL to scan, or use --dashboard for interactive mode")
-      console.error("  a11y-scan https://example.com")
-      console.error("  a11y-scan --dashboard")
+      console.error("  includa https://example.com")
+      console.error("  includa --dashboard")
       process.exit(1)
     }
 

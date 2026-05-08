@@ -87,7 +87,7 @@ jobs:
       - name: Upload build artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: a11y-scan-${{ matrix.os }}
+          name: includa-${{ matrix.os }}
           if-no-files-found: error
           retention-days: 14
           path: |

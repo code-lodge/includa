@@ -6,7 +6,7 @@ const DASHBOARD_HTML = `<!doctype html>
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>a11y-scan dashboard</title>
+  <title>Includa dashboard</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=Space+Grotesk:wght@500;700&display=swap" rel="stylesheet">
@@ -474,7 +474,7 @@ const DASHBOARD_HTML = `<!doctype html>
   <a href="#main-content" class="sr-only">Skip to main content</a>
   <div class="shell" id="main-content">
     <header class="hero">
-      <h1>a11y-scan Live Dashboard</h1>
+      <h1>Includa Live Dashboard</h1>
       <p>Streaming accessibility findings for large websites, with rule-level drilldowns and page troubleshooting.</p>
       <div style="display:flex;align-items:center;flex-wrap:wrap;gap:0.75rem;margin-top:0.85rem">
         <div class="status-pill"><span class="dot"></span><span id="scanStatus">Waiting for scan data...</span></div>

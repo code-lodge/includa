@@ -6,7 +6,7 @@ export function renderProjectsHome(projects) {
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>a11y-scan — Projects</title>
+<title>Includa — Projects</title>
 <style>
 :root {
   --bg: #0f1117;
@@ -69,7 +69,7 @@ input:focus{border-color:var(--accent)}
 <body>
 <header>
   <div>
-    <h1>a11y-scan</h1>
+    <h1>Includa</h1>
     <div class="subtitle">Accessibility Scanner</div>
   </div>
 </header>

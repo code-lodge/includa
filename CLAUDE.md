@@ -1,4 +1,4 @@
-# CLAUDE.md — a11y-scan
+# CLAUDE.md — Includa
 
 ## Project
 
@@ -15,10 +15,10 @@ Open-source WCAG 2.0/2.1/2.2 accessibility scanner for large websites. Uses Play
 npm install
 
 # Run a scan
-node bin/a11y-scan.js <url> [options]
+node bin/includa.js <url> [options]
 
 # Start the dashboard server (serves reports + scan UI)
-node bin/a11y-scan.js dashboard --port 3000
+node bin/includa.js dashboard --port 3000
 
 # Syntax-check a file
 node -c src/reporting/static-report.js
@@ -36,7 +36,7 @@ node -c src/reporting/static-report.js
 ```
 bin/
   cli.js              — CLI argument parsing (commander)
-  a11y-scan.js        — Entry point, wires CLI to scan or dashboard
+  includa.js        — Entry point, wires CLI to scan or dashboard
 
 src/
   index.js            — runScan() orchestrator: discover → scan → analyze → report

@@ -30,7 +30,7 @@ async function bootstrap() {
     height: 900,
     minWidth: 900,
     minHeight: 600,
-    title: "a11y-scan",
+    title: "Includa",
     backgroundColor: "#0f1117",
     autoHideMenuBar: true,
     show: false,
