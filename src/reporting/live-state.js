@@ -355,10 +355,12 @@ export async function createLiveStateTracker(reportDir, targetUrl, { projectId =
       state.logs = logs
       await flush()
     },
-    complete: async () => {
+    complete: async (finalSummary = {}) => {
       state.status = "completed"
       state.statusMessage = "Scan complete"
       state.finishedAt = new Date().toISOString()
+      if (finalSummary.wcagViolations) state.wcagViolations = finalSummary.wcagViolations
+      if (finalSummary.uniqueViolationsSummary) state.uniqueViolationsSummary = finalSummary.uniqueViolationsSummary
       await flush(true)
     }
   }

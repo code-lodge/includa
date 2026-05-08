@@ -330,7 +330,20 @@ export async function runScan(targetUrl, options, signal) {
   })
 
   await liveTracker.setLogs(logger.logs)
-  await liveTracker.complete()
+
+  const wcagViolations = {
+    a: (wcagLevels.wcag2a || 0) + (wcagLevels.wcag21a || 0) + (wcagLevels.wcag22a || 0),
+    aa: (wcagLevels.wcag2aa || 0) + (wcagLevels.wcag21aa || 0) + (wcagLevels.wcag22aa || 0),
+    aaa: (wcagLevels.wcag2aaa || 0) + (wcagLevels.wcag21aaa || 0) + (wcagLevels.wcag22aaa || 0)
+  }
+  const uniqueImpacts = { critical: 0, serious: 0, moderate: 0, minor: 0, unknown: 0 }
+  for (const item of dedupeItems) {
+    const key = KNOWN_IMPACTS.has(item.impact) ? item.impact : "unknown"
+    uniqueImpacts[key] += 1
+  }
+  const uniqueViolationsSummary = { ...uniqueImpacts, total: dedupeItems.length }
+
+  await liveTracker.complete({ wcagViolations, uniqueViolationsSummary })
   await clearResumeState(reportDir)
 
   const primaryOutput = formats.has("html")

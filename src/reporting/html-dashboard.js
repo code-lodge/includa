@@ -964,12 +964,25 @@ const DASHBOARD_HTML = `<!doctype html>
     }
 
     // --- score ---
+    // Matches static-report.js: weights unique violations (one per fingerprinted DOM pattern)
+    // and falls back to a per-violation severity weighting while the scan is mid-flight.
     const IMPACT_WEIGHT = { critical: 4, serious: 3, moderate: 2, minor: 1, unknown: 0.5 }
     const SCORE_MAX = 200
-    function computeLiveScore(ruleCatalog) {
-      if (!ruleCatalog || ruleCatalog.length === 0) return null
-      const weighted = ruleCatalog.reduce(function(sum, r) { return sum + (IMPACT_WEIGHT[r.impact] || 0.5) }, 0)
-      return Math.max(0, Math.round((1 - weighted / SCORE_MAX) * 100))
+    function computeLiveScore(data) {
+      const u = data && data.uniqueViolationsSummary
+      if (u && typeof u.total === 'number') {
+        if (u.total === 0) return 100
+        const weighted = (u.critical || 0) * 4 + (u.serious || 0) * 3 + (u.moderate || 0) * 2 + (u.minor || 0) * 1 + (u.unknown || 0) * 0.5
+        return Math.max(0, Math.round((1 - weighted / SCORE_MAX) * 100))
+      }
+      const sev = data && data.severity
+      if (sev) {
+        const weighted = (sev.critical || 0) * 4 + (sev.serious || 0) * 3 + (sev.moderate || 0) * 2 + (sev.minor || 0) * 1 + (sev.unknown || 0) * 0.5
+        if (weighted === 0 && (data.scannedPages || 0) > 0) return 100
+        if (weighted === 0) return null
+        return Math.max(0, Math.round((1 - weighted / SCORE_MAX) * 100))
+      }
+      return null
     }
     function scoreColor(s) { return s >= 90 ? '#22c55e' : s >= 70 ? '#fb923c' : '#ef4444' }
 
@@ -1231,12 +1244,18 @@ const DASHBOARD_HTML = `<!doctype html>
 
         document.getElementById('scanStatus').textContent = data.statusMessage || 'Running'
         document.getElementById('wcagLevel').textContent = data.wcagLevel || 'AAA'
-        const wv = data.wcagViolations || {}
+        const wv = data.wcagViolations
         const COMPLIANCE_COLOR = { AAA: '#22c55e', AA: '#22c55e', A: '#fb923c', None: '#ef4444' }
-        const complianceLevel = wv.a > 0 ? 'None' : wv.aa > 0 ? 'A' : wv.aaa > 0 ? 'AA' : 'AAA'
+        const COMPLIANCE_LABEL = { AAA: 'WCAG AAA', AA: 'WCAG AA', A: 'WCAG A', None: 'Fails WCAG A' }
         const complianceEl = document.getElementById('complianceLevel')
-        complianceEl.textContent = 'WCAG ' + complianceLevel
-        complianceEl.style.color = COMPLIANCE_COLOR[complianceLevel] || ''
+        if (wv && typeof wv.a === 'number') {
+          const lvl = wv.a > 0 ? 'None' : wv.aa > 0 ? 'A' : wv.aaa > 0 ? 'AA' : 'AAA'
+          complianceEl.textContent = COMPLIANCE_LABEL[lvl]
+          complianceEl.style.color = COMPLIANCE_COLOR[lvl] || ''
+        } else {
+          complianceEl.textContent = '–'
+          complianceEl.style.color = ''
+        }
         document.getElementById('discoveredPages').textContent = data.discoveredPages || 0
         document.getElementById('scannedPages').textContent = data.scannedPages || 0
         document.getElementById('totalViolations').textContent = data.totalViolations || 0
@@ -1249,7 +1268,7 @@ const DASHBOARD_HTML = `<!doctype html>
         document.getElementById('uniqueInapplicable').textContent = (data.uniqueInapplicableRules || 0) + ' unique rules'
         document.getElementById('rulesRunCount').textContent = (data.rulesRun || []).length
 
-        var score = computeLiveScore(data.ruleCatalog)
+        var score = computeLiveScore(data)
         var scoreEl = document.getElementById('liveScore')
         if (score !== null) {
           scoreEl.textContent = score + '/100'
