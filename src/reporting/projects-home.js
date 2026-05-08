@@ -237,6 +237,10 @@ function renderCardHtml(p) {
     ? '<a class="btn btn-sm" href="/projects/' + p.id + '/" target="_blank">Open Dashboard</a>'
     : '<span class="btn-disabled">No Report Yet</span>'
 
+  var exportBtn = p.lastScanDir
+    ? '<a class="btn btn-sm btn-ghost" href="/api/projects/' + p.id + '/export.zip" title="Download a self-contained static HTML site of this scan">Export</a>'
+    : ''
+
   var startBtn = p.scanRunning
     ? '<button class="btn btn-sm btn-danger" data-action="stop" data-id="' + p.id + '">Stop Scan</button>'
     : '<button class="btn btn-sm btn-primary" data-action="start" data-id="' + p.id + '">Start Scan</button>'
@@ -253,7 +257,7 @@ function renderCardHtml(p) {
     '<div class="card-url">' + escHtml(p.url) + '</div>' +
     '<div class="card-stats">' + (stats ? '<span>' + stats + '</span>' : '') + '<span>' + lastScan + '</span></div>' +
     '<div class="card-actions">' +
-      startBtn + resumeBtn + dashLink +
+      startBtn + resumeBtn + dashLink + exportBtn +
       '<button class="btn btn-sm btn-ghost" data-action="edit" data-id="' + p.id + '" data-name="' + escHtml(p.name) + '" data-url="' + escHtml(p.url) + '">Edit</button>' +
       '<button class="btn btn-sm btn-ghost btn-delete" data-action="delete" data-id="' + p.id + '">Delete</button>' +
     '</div>' +
@@ -307,6 +311,9 @@ function renderCardHtml(p) {
   const dashLink = p.lastScanDir
     ? `<a class="btn btn-sm" href="/projects/${p.id}/" target="_blank">Open Dashboard</a>`
     : `<span class="btn-disabled">No Report Yet</span>`
+  const exportBtn = p.lastScanDir
+    ? `<a class="btn btn-sm btn-ghost" href="/api/projects/${p.id}/export.zip" title="Download a self-contained static HTML site of this scan">Export</a>`
+    : ""
   const startBtn = p.scanRunning
     ? `<button class="btn btn-sm btn-danger" data-action="stop" data-id="${p.id}">Stop Scan</button>`
     : `<button class="btn btn-sm btn-primary" data-action="start" data-id="${p.id}">Start Scan</button>`
@@ -322,7 +329,7 @@ function renderCardHtml(p) {
   <div class="card-url">${escHtml(p.url)}</div>
   <div class="card-stats">${stats ? `<span>${stats}</span>` : ""}<span>${lastScan}</span></div>
   <div class="card-actions">
-    ${startBtn}${resumeBtn}${dashLink}
+    ${startBtn}${resumeBtn}${dashLink}${exportBtn}
     <button class="btn btn-sm btn-ghost" data-action="edit" data-id="${p.id}" data-name="${escHtml(p.name)}" data-url="${escHtml(p.url)}">Edit</button>
     <button class="btn btn-sm btn-ghost btn-delete" data-action="delete" data-id="${p.id}">Delete</button>
   </div>

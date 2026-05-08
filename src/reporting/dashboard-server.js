@@ -5,6 +5,7 @@ import { runScan } from "../index.js"
 import { writeDashboard } from "./html-dashboard.js"
 import { ProjectStore } from "../store/project-store.js"
 import { renderProjectsHome } from "./projects-home.js"
+import { exportScanToZip, safeExportFilename } from "./exporter.js"
 
 /**
  * Walk a JSON fragment and find the closing bracket/brace that matches the
@@ -356,6 +357,34 @@ export async function serveDashboard({ dataDir, port, defaultOptions = {}, initi
       // --- GET /api/projects/:id/report-dir ---
       if (req.method === "GET" && sub === "/report-dir") {
         sendJson(res, 200, { reportDir: project.lastScanDir || "" })
+        return
+      }
+
+      // --- GET /api/projects/:id/export.zip ---
+      if (req.method === "GET" && sub === "/export.zip") {
+        if (!project.lastScanDir) {
+          sendJson(res, 404, { error: "No completed scan to export" })
+          return
+        }
+        try {
+          await fs.access(project.lastScanDir)
+        } catch {
+          sendJson(res, 404, { error: "Scan directory missing on disk" })
+          return
+        }
+        const filename = safeExportFilename(project.name)
+        res.writeHead(200, {
+          "content-type": "application/zip",
+          "content-disposition": `attachment; filename="${filename}"`,
+          "cache-control": "no-store"
+        })
+        try {
+          await exportScanToZip(project.lastScanDir, project, res)
+        } catch (err) {
+          console.error("[export]", err)
+          if (!res.headersSent) sendJson(res, 500, { error: err.message })
+          else res.destroy()
+        }
         return
       }
 
