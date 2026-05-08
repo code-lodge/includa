@@ -548,7 +548,7 @@ const DASHBOARD_HTML = `<!doctype html>
       <article class="stat"><div class="label">Incomplete</div><div id="totalIncomplete" class="value" style="color: var(--warn)">0</div><div id="uniqueIncomplete" class="sub-label">0 unique rules</div></article>
       <article class="stat"><div class="label">Inapplicable</div><div id="totalInapplicable" class="value" style="color: var(--muted)">0</div><div id="uniqueInapplicable" class="sub-label">0 unique rules</div></article>
       <article class="stat"><div class="label">Rules Run</div><div id="rulesRunCount" class="value">0</div></article>
-      <article class="stat"><div class="label">Score</div><div id="liveScore" class="value" style="font-size:1.6rem">–</div></article>
+      <article class="stat" title="Weighted % of axe rules passed across the scan. Heuristic — does not prove WCAG conformance."><div class="label">Score</div><div id="liveScore" class="value" style="font-size:1.6rem">–</div><div id="scoreSubLabel" class="sub-label">–</div></article>
     </section>
 
     <div id="reportLinks" style="display:none;margin:-0.5rem 0 1rem;gap:0.75rem;flex-wrap:wrap">
@@ -964,27 +964,30 @@ const DASHBOARD_HTML = `<!doctype html>
     }
 
     // --- score ---
-    // Matches static-report.js: weights unique violations (one per fingerprinted DOM pattern)
-    // and falls back to a per-violation severity weighting while the scan is mid-flight.
-    const IMPACT_WEIGHT = { critical: 4, serious: 3, moderate: 2, minor: 1, unknown: 0.5 }
-    const SCORE_MAX = 200
+    // Lighthouse-style: weighted % of axe rules that passed across the scan.
+    // A rule counts as "failed" if it produced any violation; "passed" if it ran and
+    // never failed. Matches the formula in src/index.js so live and final agree.
+    const LH_WEIGHT = { critical: 10, serious: 7, moderate: 3, minor: 1 }
+    function lhWeight(impact) { return LH_WEIGHT[impact] || 3 }
     function computeLiveScore(data) {
-      const u = data && data.uniqueViolationsSummary
-      if (u && typeof u.total === 'number') {
-        if (u.total === 0) return 100
-        const weighted = (u.critical || 0) * 4 + (u.serious || 0) * 3 + (u.moderate || 0) * 2 + (u.minor || 0) * 1 + (u.unknown || 0) * 0.5
-        return Math.max(0, Math.round((1 - weighted / SCORE_MAX) * 100))
+      // Final score from the orchestrator wins once the scan completes.
+      if (data && data.scoreSummary && typeof data.scoreSummary.score === 'number') {
+        return data.scoreSummary.score
       }
-      const sev = data && data.severity
-      if (sev) {
-        const weighted = (sev.critical || 0) * 4 + (sev.serious || 0) * 3 + (sev.moderate || 0) * 2 + (sev.minor || 0) * 1 + (sev.unknown || 0) * 0.5
-        if (weighted === 0 && (data.scannedPages || 0) > 0) return 100
-        if (weighted === 0) return null
-        return Math.max(0, Math.round((1 - weighted / SCORE_MAX) * 100))
+      const failed = (data && data.ruleCatalog) || []
+      const passed = (data && data.passesRuleCatalog) || []
+      const failedIds = new Set(failed.map(function(r) { return r.id }))
+      var failedW = 0
+      for (var i = 0; i < failed.length; i++) failedW += lhWeight(failed[i].impact)
+      var passedW = 0
+      for (var j = 0; j < passed.length; j++) {
+        if (!failedIds.has(passed[j].id)) passedW += lhWeight(passed[j].impact)
       }
-      return null
+      const total = failedW + passedW
+      if (total === 0) return (data && data.scannedPages > 0) ? 100 : null
+      return Math.round((passedW / total) * 100)
     }
-    function scoreColor(s) { return s >= 90 ? '#22c55e' : s >= 70 ? '#fb923c' : '#ef4444' }
+    function scoreColor(s) { return s >= 90 ? '#22c55e' : s >= 50 ? '#fb923c' : '#ef4444' }
 
     // --- utilities ---
     function safeSlugClient(str) {
@@ -1270,12 +1273,26 @@ const DASHBOARD_HTML = `<!doctype html>
 
         var score = computeLiveScore(data)
         var scoreEl = document.getElementById('liveScore')
+        var scoreSubEl = document.getElementById('scoreSubLabel')
         if (score !== null) {
           scoreEl.textContent = score + '/100'
           scoreEl.style.color = scoreColor(score)
+          var ss = data.scoreSummary
+          if (ss && ss.totalRuleCount) {
+            scoreSubEl.textContent = ss.passedRuleCount + '/' + ss.totalRuleCount + ' rules passed'
+          } else {
+            var failedCount = ((data.ruleCatalog) || []).length
+            var passedSet = {}
+            ;((data.passesRuleCatalog) || []).forEach(function(r) { passedSet[r.id] = true })
+            ;((data.ruleCatalog) || []).forEach(function(r) { delete passedSet[r.id] })
+            var passedCount = Object.keys(passedSet).length
+            var totalCount = passedCount + failedCount
+            scoreSubEl.textContent = totalCount > 0 ? (passedCount + '/' + totalCount + ' rules passed') : '–'
+          }
         } else {
           scoreEl.textContent = '–'
           scoreEl.style.color = ''
+          scoreSubEl.textContent = '–'
         }
 
         var reportLinksEl = document.getElementById('reportLinks')

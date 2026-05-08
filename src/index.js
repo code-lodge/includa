@@ -13,6 +13,9 @@ const KNOWN_IMPACTS = new Set(["critical", "serious", "moderate", "minor"])
 const WCAG_TAGS = ["wcag2a","wcag2aa","wcag2aaa","wcag21a","wcag21aa","wcag21aaa","wcag22a","wcag22aa","wcag22aaa"]
 const IMPACT_WEIGHT = { critical: 4, serious: 3, moderate: 2, minor: 1, unknown: 0.5 }
 const IMPACT_ORDER = { critical: 0, serious: 1, moderate: 2, minor: 3, unknown: 4 }
+// Lighthouse-style audit weights — used to compute pass-rate score across rules
+const LIGHTHOUSE_WEIGHT = { critical: 10, serious: 7, moderate: 3, minor: 1 }
+function lhWeight(impact) { return LIGHTHOUSE_WEIGHT[impact] || 3 }
 
 async function* streamJsonl(filePath) {
   try {
@@ -187,6 +190,7 @@ export async function runScan(targetUrl, options, signal) {
   }
   const wcagLevels = Object.fromEntries(WCAG_TAGS.map((t) => [t, 0]))
   const ruleAcc = {}
+  const passesRuleAcc = {}
   const templateAcc = {}
   const dedupeMap = new Map()
   const pagesLite = []
@@ -258,7 +262,14 @@ export async function runScan(targetUrl, options, signal) {
     }
 
     if (page.passes) {
-      for (const p of page.passes) severity.totalPasses += Math.max(1, p.nodes.length)
+      for (const p of page.passes) {
+        severity.totalPasses += Math.max(1, p.nodes.length)
+        if (!passesRuleAcc[p.id]) {
+          passesRuleAcc[p.id] = { id: p.id, impact: p.impact || null }
+        } else if (!passesRuleAcc[p.id].impact && p.impact) {
+          passesRuleAcc[p.id].impact = p.impact
+        }
+      }
     }
     if (page.incomplete) {
       for (const item of page.incomplete) severity.totalIncomplete += Math.max(1, item.nodes.length)
@@ -275,6 +286,36 @@ export async function runScan(targetUrl, options, signal) {
 
     if (!pagesByTemplate[template]) pagesByTemplate[template] = []
     pagesByTemplate[template].push({ url: page.url, violationCount, status: page.status })
+  }
+
+  // Lighthouse-style score: sum(weights of rules passed) / sum(weights of all rules that ran)
+  // A rule counts as "failed" if it produced any violation across the scan.
+  // Rules in passes that never failed count as "passed". For passes axe omits impact,
+  // so unknown impact gets a moderate default weight (3).
+  let lhFailedWeight = 0
+  let lhPassedWeight = 0
+  let lhFailedCount = 0
+  let lhPassedCount = 0
+  for (const ruleId of Object.keys(ruleAcc)) {
+    lhFailedWeight += lhWeight(ruleAcc[ruleId].impact)
+    lhFailedCount += 1
+  }
+  for (const ruleId of Object.keys(passesRuleAcc)) {
+    if (ruleAcc[ruleId]) continue
+    lhPassedWeight += lhWeight(passesRuleAcc[ruleId].impact)
+    lhPassedCount += 1
+  }
+  const lhTotalWeight = lhFailedWeight + lhPassedWeight
+  const lighthouseScore = lhTotalWeight > 0
+    ? Math.round((lhPassedWeight / lhTotalWeight) * 100)
+    : (pagesLite.length > 0 ? 100 : null)
+  const scoreSummary = {
+    score: lighthouseScore,
+    passedRuleCount: lhPassedCount,
+    failedRuleCount: lhFailedCount,
+    totalRuleCount: lhPassedCount + lhFailedCount,
+    passedWeight: lhPassedWeight,
+    failedWeight: lhFailedWeight
   }
 
   const dedupeItems = Array.from(dedupeMap.values()).map((entry) => ({
@@ -326,6 +367,7 @@ export async function runScan(targetUrl, options, signal) {
     ruleSummary: { rules: ruleAcc },
     templateSummary: { templates: templateAcc },
     uniqueViolations,
+    scoreSummary,
     logs: logger.logs
   })
 
@@ -343,7 +385,7 @@ export async function runScan(targetUrl, options, signal) {
   }
   const uniqueViolationsSummary = { ...uniqueImpacts, total: dedupeItems.length }
 
-  await liveTracker.complete({ wcagViolations, uniqueViolationsSummary })
+  await liveTracker.complete({ wcagViolations, uniqueViolationsSummary, scoreSummary })
   await clearResumeState(reportDir)
 
   const primaryOutput = formats.has("html")

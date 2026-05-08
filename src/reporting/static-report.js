@@ -2,32 +2,17 @@ import fs from "node:fs/promises"
 import path from "node:path"
 import { escapeHtml, safeSlug, templateFolder } from "../utils/url-utils.js"
 
-const UNIQUE_IMPACT_WEIGHT = { critical: 4, serious: 3, moderate: 2, minor: 1, unknown: 0.5 }
-// 50 critical unique violations → score 0; 0 violations → score 100
-const SCORE_MAX_WEIGHT = 200
-
-function computeScore(uniqueItems, severitySummary) {
-  if (uniqueItems) {
-    if (uniqueItems.length === 0) return 100
-    const weighted = uniqueItems.reduce((sum, item) => sum + (UNIQUE_IMPACT_WEIGHT[item.impact] ?? 0.5), 0)
-    return Math.max(0, Math.round((1 - weighted / SCORE_MAX_WEIGHT) * 100))
-  }
-  // fallback when unique data is unavailable
-  const { totalPasses = 0, totalViolations = 0, totalIncomplete = 0 } = severitySummary
-  const total = totalPasses + totalViolations + totalIncomplete
-  if (total === 0) return 100
-  return Math.round((totalPasses / total) * 100)
-}
-
+// Lighthouse-style score: weighted % of axe rules that passed across the scan.
+// scoreSummary is computed in src/index.js and passed in via the payload.
 function scoreColor(score) {
   if (score >= 90) return "#22c55e"
-  if (score >= 70) return "#fb923c"
+  if (score >= 50) return "#fb923c"
   return "#ef4444"
 }
 
 function scoreLabel(score) {
   if (score >= 90) return "Good"
-  if (score >= 70) return "Needs Work"
+  if (score >= 50) return "Needs Work"
   return "Poor"
 }
 
@@ -67,7 +52,8 @@ export async function writeStaticReport(reportDir, payload) {
   const { summary, severitySummary, ruleSummary, templateSummary, pagesLite } = payload
   const uniqueItems = (payload.uniqueViolations && payload.uniqueViolations.uniqueViolations) || null
   const impacts = severitySummary.impacts || {}
-  const score = computeScore(uniqueItems, severitySummary)
+  const scoreSummary = payload.scoreSummary || {}
+  const score = typeof scoreSummary.score === "number" ? scoreSummary.score : 100
   const color = scoreColor(score)
   const label = scoreLabel(score)
 
@@ -447,7 +433,7 @@ export async function writeStaticReport(reportDir, payload) {
           <span class="score-num">${score}</span>
           <span class="score-lbl">${escapeHtml(label)}</span>
         </div>
-        ${uniqueTotal !== null ? `<p style="margin:0.5rem 0 0;font-size:0.76rem;color:var(--muted);text-align:center;max-width:160px">Based on ${uniqueTotal} unique issue${uniqueTotal !== 1 ? "s" : ""} to fix</p>` : ""}
+        ${scoreSummary.totalRuleCount ? `<p style="margin:0.5rem 0 0;font-size:0.72rem;color:var(--muted);text-align:center;max-width:170px">${scoreSummary.passedRuleCount}/${scoreSummary.totalRuleCount} axe rules passed across the scan. Heuristic — does not prove WCAG conformance.</p>` : ""}
       </div>
     </header>
 

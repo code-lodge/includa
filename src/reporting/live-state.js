@@ -361,6 +361,7 @@ export async function createLiveStateTracker(reportDir, targetUrl, { projectId =
       state.finishedAt = new Date().toISOString()
       if (finalSummary.wcagViolations) state.wcagViolations = finalSummary.wcagViolations
       if (finalSummary.uniqueViolationsSummary) state.uniqueViolationsSummary = finalSummary.uniqueViolationsSummary
+      if (finalSummary.scoreSummary) state.scoreSummary = finalSummary.scoreSummary
       await flush(true)
     }
   }
