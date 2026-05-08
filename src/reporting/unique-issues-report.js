@@ -138,8 +138,11 @@ export async function writeUniqueIssuesReport(reportDir, uniqueViolationsData, t
       platform: item.cms.platform,
       templateFile: item.cms.templateFile,
       hierarchy: item.cms.hierarchy,
+      label: item.cms.label || null,
       isBlockTheme: item.cms.isBlockTheme || false,
       templateParts: item.cms.templateParts || [],
+      pageBuilder: item.cms.pageBuilder || null,
+      noEdit: item.cms.noEdit || false,
     } : null,
   })))
 
