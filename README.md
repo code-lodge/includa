@@ -5,14 +5,14 @@
 <br />
 
 [![License: GPL-3.0](https://img.shields.io/badge/license-GPL--3.0-2dd4bf?style=flat-square)](LICENSE)
-[![Latest release](https://img.shields.io/github/v/release/anomalyco/includa?style=flat-square&color=38bdf8)](https://github.com/anomalyco/includa/releases/latest)
-[![Build](https://img.shields.io/github/actions/workflow/status/anomalyco/includa/release.yml?style=flat-square&label=build)](https://github.com/anomalyco/includa/actions)
-[![Platforms](https://img.shields.io/badge/platforms-Windows%20·%20macOS%20·%20Linux-9fb4c3?style=flat-square)](https://github.com/anomalyco/includa/releases/latest)
+[![Latest release](https://img.shields.io/github/v/release/code-lodge/includa?style=flat-square&color=38bdf8)](https://github.com/code-lodge/includa/releases/latest)
+[![Build](https://img.shields.io/github/actions/workflow/status/code-lodge/includa/release.yml?style=flat-square&label=build)](https://github.com/code-lodge/includa/actions)
+[![Platforms](https://img.shields.io/badge/platforms-Windows%20·%20macOS%20·%20Linux-9fb4c3?style=flat-square)](https://github.com/code-lodge/includa/releases/latest)
 [![Powered by Playwright + axe-core](https://img.shields.io/badge/powered%20by-Playwright%20%2B%20axe--core-2dd4bf?style=flat-square)](https://playwright.dev)
 
 **Open-source accessibility scanner that crawls every page of a website, audits against WCAG 2.0 / 2.1 / 2.2, deduplicates issues across templates, and generates AI-ready fix prompts.**
 
-[Website](https://includa.app) · [Download](https://github.com/anomalyco/includa/releases/latest) · [Documentation](#documentation) · [Report a bug](https://github.com/anomalyco/includa/issues/new)
+[Website](https://includa.app) · [Download](https://github.com/code-lodge/includa/releases/latest) · [Documentation](#documentation) · [Report a bug](https://github.com/code-lodge/includa/issues/new)
 
 </div>
 
@@ -46,7 +46,7 @@ A scan of a typical mid-size storefront produces hundreds of raw violations. Inc
 
 ### Desktop app (recommended)
 
-Download the latest installer for your platform from the [releases page](https://github.com/anomalyco/includa/releases/latest):
+Download the latest installer for your platform from the [releases page](https://github.com/code-lodge/includa/releases/latest):
 
 | Platform | Download |
 |---|---|
@@ -61,7 +61,7 @@ Double-click to launch. The Chromium browser engine (~300 MB) downloads on first
 ### Command line
 
 ```bash
-git clone https://github.com/anomalyco/includa.git
+git clone https://github.com/code-lodge/includa.git
 cd includa
 npm install
 
@@ -218,7 +218,7 @@ The CLI and the desktop app share the same scan engine — the desktop app just 
 ## Development
 
 ```bash
-git clone https://github.com/anomalyco/includa.git
+git clone https://github.com/code-lodge/includa.git
 cd includa
 npm install
 
@@ -260,7 +260,7 @@ This is an automated technical scanning tool designed for informational purposes
 
 ## License
 
-[GPL-3.0](LICENSE) © Anomaly Co.
+[GPL-3.0](LICENSE) © Code Lodge
 
 Includa is built on top of these open-source projects:
 

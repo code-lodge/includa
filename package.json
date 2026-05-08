@@ -22,9 +22,9 @@
   ],
   "repository": {
     "type": "git",
-    "url": "https://github.com/anomalyco/includa.git"
+    "url": "https://github.com/code-lodge/includa.git"
   },
-  "homepage": "https://github.com/anomalyco/includa#readme",
+  "homepage": "https://github.com/code-lodge/includa#readme",
   "files": [
     "bin/",
     "src/",
@@ -59,7 +59,7 @@
     "png2icons": "^2.0.1"
   },
   "build": {
-    "appId": "com.anomalyco.includa",
+    "appId": "com.code-lodge.includa",
     "productName": "Includa",
     "asar": true,
     "npmRebuild": false,
