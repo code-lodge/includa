@@ -25,9 +25,15 @@ const PLATFORM_LABEL = {
 
 function renderCmsPanel(cms) {
   const platform = PLATFORM_LABEL[cms.platform] || cms.platform
+  const builderSuffix = cms.pageBuilder === "pagefly" ? " + PageFly" : ""
 
   let bodyHtml
-  if (cms.noEdit) {
+  if (cms.pageBuilder === "pagefly") {
+    bodyHtml = `<p style="margin:0;font-size:0.82rem;color:#9fb4c3">
+      This page is built with <strong style="color:#e9f2f8">PageFly</strong> on ${escapeHtml(platform)}.
+      Open the page in PageFly's visual editor to fix accessibility issues.
+    </p>`
+  } else if (cms.noEdit) {
     bodyHtml = `<p style="margin:0;font-size:0.82rem;color:#9fb4c3">
       This platform uses a visual editor — templates are not directly editable as files.
       Make changes in the <strong style="color:#e9f2f8">${escapeHtml(platform)}</strong> design tools.
@@ -56,7 +62,7 @@ function renderCmsPanel(cms) {
   return `
     <details style="margin-bottom:1rem;border:1px solid rgba(157,197,220,0.22);border-radius:10px;padding:0.7rem 1rem;background:rgba(12,29,42,0.7)">
       <summary style="cursor:pointer;font-size:0.83rem;color:#2dd4bf;font-weight:600;user-select:none">
-        ${escapeHtml(platform)} template — ${escapeHtml(cms.label || cms.templateType || "unknown")}
+        ${escapeHtml(platform)}${escapeHtml(builderSuffix)} template — ${escapeHtml(cms.label || cms.templateType || "unknown")}
       </summary>
       <div style="margin-top:0.6rem">${bodyHtml}</div>
     </details>`

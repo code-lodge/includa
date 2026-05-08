@@ -61,9 +61,10 @@ export function detectCms(signals) {
       hierarchy:     tpl?.hierarchy     ?? [],
       label:         tpl?.label         ?? detector.platform,
     }
-    if (detector.noEdit) result.noEdit = true
+    if (detector.noEdit || tpl?.noEdit) result.noEdit = true
     if (tpl?.isBlockTheme) result.isBlockTheme = true
     if (tpl?.templateParts) result.templateParts = tpl.templateParts
+    if (tpl?.pageBuilder) result.pageBuilder = tpl.pageBuilder
     return result
   }
   return null
@@ -95,5 +96,8 @@ export function cmsSignalScript() {
     hasWpSiteBlocks:    !!document.querySelector('.wp-site-blocks'),
     hasGlobalStyles:    !!document.getElementById('global-styles-inline-css'),
     hasBlockTemplateParts: !!document.querySelector('.wp-block-template-part'),
+    hasPageFly:           !!document.querySelector('[data-pf-type], .pf-c-ct, [class*="__pf"]'),
+    hasPageFlyScript:     !!document.querySelector('script[src*="pagefly"], link[href*="pagefly"]'),
+    pageFlyType:          document.querySelector('[data-pf-type]')?.getAttribute('data-pf-type') ?? "",
   }))()`
 }

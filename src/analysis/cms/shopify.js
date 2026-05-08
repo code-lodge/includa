@@ -86,18 +86,26 @@ export default {
     return false
   },
 
-  detectTemplate({ bodyClass }) {
+  detectTemplate({ bodyClass, hasPageFly, hasPageFlyScript, pageFlyType }) {
     if (!bodyClass) return null
     const classes = bodyClass.trim().split(/\s+/).filter(Boolean)
     const tplClass = classes.find(c => c.startsWith("template-"))
     if (!tplClass) return null
 
     const { templateType, templateFile, label } = resolveTemplate(tplClass)
-    return {
+    const result = {
       templateType,
       templateFile,
       hierarchy: [templateFile],
       label,
     }
+
+    if (hasPageFly || hasPageFlyScript) {
+      result.pageBuilder = "pagefly"
+      result.noEdit = true
+      if (pageFlyType) result.pageFlyType = pageFlyType
+    }
+
+    return result
   },
 }
