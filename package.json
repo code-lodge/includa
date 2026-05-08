@@ -55,7 +55,8 @@
   },
   "devDependencies": {
     "electron": "^32.3.3",
-    "electron-builder": "^24.13.3"
+    "electron-builder": "^24.13.3",
+    "png2icons": "^2.0.1"
   },
   "build": {
     "appId": "com.anomalyco.includa",

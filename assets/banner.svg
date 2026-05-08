@@ -1,0 +1,102 @@
+<svg width="1280" height="400" viewBox="0 0 1280 400" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Includa — accessibility scanning for the whole site">
+  <title>Includa — accessibility scanning for the whole site</title>
+  <defs>
+    <linearGradient id="bg-grad-b" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#08131d"/>
+      <stop offset="100%" stop-color="#0c1d2a"/>
+    </linearGradient>
+    <radialGradient id="glow-1" cx="18%" cy="35%" r="40%">
+      <stop offset="0%" stop-color="#2dd4bf" stop-opacity="0.32"/>
+      <stop offset="100%" stop-color="#2dd4bf" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="glow-2" cx="82%" cy="65%" r="40%">
+      <stop offset="0%" stop-color="#38bdf8" stop-opacity="0.22"/>
+      <stop offset="100%" stop-color="#38bdf8" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="logo-grad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#2dd4bf"/>
+      <stop offset="100%" stop-color="#38bdf8"/>
+    </linearGradient>
+    <linearGradient id="accent-text" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#2dd4bf"/>
+      <stop offset="100%" stop-color="#38bdf8"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Background with overlapping glows -->
+  <rect width="1280" height="400" fill="url(#bg-grad-b)"/>
+  <rect width="1280" height="400" fill="url(#glow-1)"/>
+  <rect width="1280" height="400" fill="url(#glow-2)"/>
+
+  <!-- Subtle dotted grid representing pages being scanned -->
+  <g fill="#9fb4c3" opacity="0.18">
+    <circle cx="940" cy="80" r="3"/>
+    <circle cx="1000" cy="80" r="3"/>
+    <circle cx="1060" cy="80" r="3"/>
+    <circle cx="1120" cy="80" r="3"/>
+    <circle cx="1180" cy="80" r="3"/>
+    <circle cx="940" cy="140" r="3"/>
+    <circle cx="1000" cy="140" r="3"/>
+    <circle cx="1060" cy="140" r="3"/>
+    <circle cx="1120" cy="140" r="3"/>
+    <circle cx="1180" cy="140" r="3"/>
+    <circle cx="940" cy="200" r="3"/>
+    <circle cx="1000" cy="200" r="3"/>
+    <circle cx="1060" cy="200" r="3"/>
+    <circle cx="1120" cy="200" r="3"/>
+    <circle cx="1180" cy="200" r="3"/>
+    <circle cx="940" cy="260" r="3"/>
+    <circle cx="1000" cy="260" r="3"/>
+    <circle cx="1060" cy="260" r="3"/>
+    <circle cx="1120" cy="260" r="3"/>
+    <circle cx="1180" cy="260" r="3"/>
+    <circle cx="940" cy="320" r="3"/>
+    <circle cx="1000" cy="320" r="3"/>
+    <circle cx="1060" cy="320" r="3"/>
+    <circle cx="1120" cy="320" r="3"/>
+    <circle cx="1180" cy="320" r="3"/>
+  </g>
+
+  <!-- Highlight a few of those dots in accent green to suggest "fixed" / "passing" -->
+  <g fill="#2dd4bf">
+    <circle cx="1000" cy="140" r="4"/>
+    <circle cx="1120" cy="200" r="4"/>
+    <circle cx="940" cy="260" r="4"/>
+    <circle cx="1180" cy="320" r="4"/>
+  </g>
+
+  <!-- Logo mark (square icon) -->
+  <g transform="translate(80, 120)">
+    <rect width="160" height="160" rx="36" ry="36" fill="url(#logo-grad)"/>
+    <g fill="#02151b" transform="scale(0.156)">
+      <rect x="278" y="402" width="92" height="354" rx="46" ry="46"/>
+      <circle cx="324" cy="312" r="56"/>
+      <path d="
+        M 478 756
+        L 478 402
+        L 570 402
+        L 570 458
+        C 600 415, 642 392, 690 392
+        C 770 392, 818 442, 818 532
+        L 818 756
+        L 726 756
+        L 726 552
+        C 726 504, 706 478, 666 478
+        C 618 478, 570 510, 570 580
+        L 570 756
+        Z
+      "/>
+    </g>
+  </g>
+
+  <!-- Wordmark + tagline -->
+  <g font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif">
+    <text x="280" y="190" font-size="84" font-weight="700" fill="#e9f2f8" letter-spacing="-2">Includa</text>
+    <text x="280" y="240" font-size="22" font-weight="500" fill="#9fb4c3" letter-spacing="0.2">
+      Accessibility scanning <tspan fill="url(#accent-text)" font-weight="600">for the whole site</tspan>.
+    </text>
+    <text x="280" y="290" font-size="15" font-weight="400" fill="#7a8a99" letter-spacing="0.3">
+      Open source · WCAG 2.0 / 2.1 / 2.2 · Playwright + axe-core
+    </text>
+  </g>
+</svg>

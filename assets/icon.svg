@@ -1,0 +1,47 @@
+<svg width="1024" height="1024" viewBox="0 0 1024 1024" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Includa">
+  <title>Includa</title>
+  <defs>
+    <linearGradient id="bg-grad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#2dd4bf"/>
+      <stop offset="100%" stop-color="#38bdf8"/>
+    </linearGradient>
+    <radialGradient id="highlight" cx="28%" cy="22%" r="55%">
+      <stop offset="0%" stop-color="#ffffff" stop-opacity="0.22"/>
+      <stop offset="60%" stop-color="#ffffff" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="ink" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#02151b"/>
+      <stop offset="100%" stop-color="#08131d"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Rounded background with iOS-style corners -->
+  <rect x="0" y="0" width="1024" height="1024" rx="232" ry="232" fill="url(#bg-grad)"/>
+  <rect x="0" y="0" width="1024" height="1024" rx="232" ry="232" fill="url(#highlight)"/>
+
+  <!-- Stylised "i" + "n" letterforms drawn as paths so the icon renders identically
+       without depending on which webfonts the renderer happens to have installed. -->
+  <g fill="url(#ink)">
+    <!-- "i" stem -->
+    <rect x="278" y="402" width="92" height="354" rx="46" ry="46"/>
+    <!-- "i" dot -->
+    <circle cx="324" cy="312" r="56"/>
+
+    <!-- "n" — vertical stem on left, arch on right. Drawn as a single closed path. -->
+    <path d="
+      M 478 756
+      L 478 402
+      L 570 402
+      L 570 458
+      C 600 415, 642 392, 690 392
+      C 770 392, 818 442, 818 532
+      L 818 756
+      L 726 756
+      L 726 552
+      C 726 504, 706 478, 666 478
+      C 618 478, 570 510, 570 580
+      L 570 756
+      Z
+    "/>
+  </g>
+</svg>
