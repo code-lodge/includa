@@ -20,7 +20,7 @@
 
 ## Why Includa
 
-Most a11y tools test one URL at a time. They tell you the homepage has 12 issues — they don't tell you whether those same 12 issues appear on the other 8,000 pages, or which template is responsible. Includa was built for sites that don't fit on one screen.
+Most a11y tools test one URL at a time. They tell you the homepage has 12 issues — they don't tell you whether those same 12 issues appear on the other 8,000 pages, or which template is responsible. Includa was built for sites with hundreds or thousands of pages.
 
 A scan of a typical mid-size storefront produces hundreds of raw violations. Includa fingerprints them by rule + normalized selector, so the same broken pattern on 200 pages collapses into a single entry. You go from "fix 1,200 violations" to "fix 8 root causes," with the affected page count next to each.
 
