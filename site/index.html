@@ -167,6 +167,13 @@
       text-align: center;
       position: relative;
     }
+    .badge-row {
+      display: inline-flex;
+      flex-wrap: wrap;
+      gap: 0.5rem;
+      justify-content: center;
+      margin-bottom: 1.5rem;
+    }
     .badge {
       display: inline-flex;
       align-items: center;
@@ -180,7 +187,25 @@
       border: 1px solid rgba(45, 212, 191, 0.28);
       padding: 0.4rem 0.95rem;
       border-radius: 999px;
-      margin-bottom: 1.5rem;
+    }
+    .badge-alpha {
+      color: var(--accent-warm);
+      background: rgba(251, 146, 60, 0.1);
+      border-color: rgba(251, 146, 60, 0.32);
+    }
+    .nav-pill-alpha {
+      display: inline-flex;
+      align-items: center;
+      font-size: 0.66rem;
+      font-weight: 700;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: var(--accent-warm);
+      background: rgba(251, 146, 60, 0.12);
+      border: 1px solid rgba(251, 146, 60, 0.36);
+      padding: 0.2rem 0.55rem;
+      border-radius: 999px;
+      margin-left: 0.5rem;
     }
     .hero h1 {
       font-family: "Space Grotesk", system-ui, sans-serif;
@@ -549,6 +574,7 @@
       <a class="brand" href="#top" aria-label="Includa, home">
         <img class="brand-mark" src="favicon.svg" width="30" height="30" alt="" aria-hidden="true" />
         <span>Includa</span>
+        <span class="nav-pill-alpha" aria-label="Alpha release, not production ready">Alpha</span>
       </a>
       <nav class="nav-links" aria-label="Primary">
         <a href="#features">Features</a>
@@ -565,7 +591,10 @@
   <main id="main">
     <section class="hero" id="top" aria-labelledby="hero-title">
       <div class="shell">
-        <span class="badge">Open source · GPL-3.0</span>
+        <div class="badge-row">
+          <span class="badge badge-alpha" title="Includa is in active alpha — APIs and report formats may change between minor versions.">Alpha · Not production ready</span>
+          <span class="badge">Open source · GPL-3.0</span>
+        </div>
         <h1 id="hero-title">Accessibility scanning<br /><span class="accent">for the whole site.</span></h1>
         <p class="subtitle">
           Includa crawls every page of your website, runs WCAG 2.0/2.1/2.2 audits with axe-core,
