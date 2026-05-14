@@ -273,6 +273,45 @@
     .hero-meta { color: var(--muted); font-size: 0.86rem; margin-top: 1.6rem; }
     .hero-meta strong { color: var(--text); font-weight: 600; }
 
+    /* Status pill row — sits between the CTA buttons and the screenshot,
+       mirroring the dot-pill pattern from similar OSS landing pages. */
+    .pill-row {
+      display: inline-flex;
+      flex-wrap: wrap;
+      gap: 0.65rem;
+      justify-content: center;
+      margin-top: 1.6rem;
+    }
+    .pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.5rem;
+      font-size: 0.74rem;
+      font-weight: 700;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      padding: 0.45rem 1rem;
+      border-radius: 999px;
+    }
+    .pill::before {
+      content: "";
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      background: currentColor;
+      flex-shrink: 0;
+    }
+    .pill-alpha {
+      color: var(--accent-warm);
+      background: rgba(251, 146, 60, 0.1);
+      border: 1px solid rgba(251, 146, 60, 0.32);
+    }
+    .pill-local {
+      color: var(--good);
+      background: rgba(34, 197, 94, 0.08);
+      border: 1px solid rgba(34, 197, 94, 0.32);
+    }
+
     /* Hero screenshot — floats below the hero copy with a faux browser frame. */
     .hero-shot {
       max-width: 1080px;
@@ -626,6 +665,10 @@
         <div class="cta-row">
           <a class="btn btn-primary" href="#download">Download for your platform</a>
           <a class="btn btn-ghost" href="https://github.com/code-lodge/includa" rel="noreferrer">View on GitHub</a>
+        </div>
+        <div class="pill-row" role="status" aria-label="Project status">
+          <span class="pill pill-alpha">Alpha · Not production ready</span>
+          <span class="pill pill-local">100% Local · No telemetry · No API key</span>
         </div>
         <p class="hero-meta">
           Free · Runs entirely on your machine · No data leaves your computer
