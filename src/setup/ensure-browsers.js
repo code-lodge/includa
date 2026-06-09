@@ -33,16 +33,24 @@ function playwrightCliPath() {
   return path.join(playwrightCoreDir(), "cli.js").replace(/app\.asar([\\/])/, "app.asar.unpacked$1")
 }
 
-// The exact Chromium build id this Playwright expects (e.g. "1223"). Read from
-// the static browsers.json so we don't have to import Playwright. Null if unknown.
-function expectedChromiumRevision() {
+// Read Playwright's static browsers.json (build ids per browser) without
+// importing Playwright. Null if unreadable.
+function readBrowsersJson() {
   try {
-    const data = JSON.parse(fs.readFileSync(path.join(playwrightCoreDir(), "browsers.json"), "utf8"))
-    const entry = (data.browsers || []).find((b) => b.name === "chromium")
-    return entry?.revision || null
+    return JSON.parse(fs.readFileSync(path.join(playwrightCoreDir(), "browsers.json"), "utf8"))
   } catch {
     return null
   }
+}
+
+// The Chromium components a scan needs: full `chromium` (headed launches) and
+// `chromium-headless-shell` (what headless launches use — the default in
+// Playwright >=1.49). Derived from browsers.json so it tracks version changes,
+// and scoped to the default-installed chromium family (not tip-of-tree).
+function requiredChromiumComponents(data) {
+  return (data?.browsers || [])
+    .filter((b) => b.installByDefault && /^chromium(-headless-shell)?$/.test(b.name))
+    .map((b) => ({ name: b.name, revision: b.revision }))
 }
 
 // Playwright's default (global) browser cache, mirroring its own path logic.
@@ -57,43 +65,49 @@ function defaultBrowsersDir() {
   return path.join(os.homedir(), ".cache", "ms-playwright")
 }
 
-// Absolute path to the Chromium executable inside a `chromium-<rev>` folder, or
-// null. Handles the per-platform layout Playwright unpacks into.
-function chromiumExecutableUnder(revDir) {
-  const layouts = process.platform === "win32"
-    ? [["chrome-win64", "chrome.exe"], ["chrome-win", "chrome.exe"]]
-    : process.platform === "darwin"
-      ? [["chrome-mac", "Chromium.app", "Contents", "MacOS", "Chromium"]]
-      : [["chrome-linux", "chrome"]]
-  for (const rel of layouts) {
-    const candidate = path.join(revDir, ...rel)
-    if (fs.existsSync(candidate)) return candidate
+// Is one Chromium component fully extracted under `browsersDir`? The component
+// folder is e.g. `chromium-1223` or `chromium_headless_shell-1223` (Playwright
+// turns dashes into underscores), with the binary in a single platform subfolder.
+// We don't hard-code the subfolder name (it varies by arch); we look for the
+// expected executable inside it. The pre-1.60 extraction bug on Node >=24.16 left
+// the binary but dropped companion files, so on Windows we also require icudtl.dat.
+function componentComplete(browsersDir, name, revision) {
+  const compDir = path.join(browsersDir, `${name.replace(/-/g, "_")}-${revision}`)
+  if (!fs.existsSync(compDir)) return false
+
+  const exeName = name.includes("headless")
+    ? (process.platform === "win32" ? "chrome-headless-shell.exe" : "chrome-headless-shell")
+    : (process.platform === "win32" ? "chrome.exe" : "chrome")
+
+  let subdirs
+  try {
+    subdirs = fs.readdirSync(compDir, { withFileTypes: true }).filter((d) => d.isDirectory())
+  } catch {
+    return false
   }
-  return null
+
+  for (const entry of subdirs) {
+    const folder = path.join(compDir, entry.name)
+    if (fs.existsSync(path.join(folder, exeName))) {
+      if (process.platform === "win32") return fs.existsSync(path.join(folder, "icudtl.dat"))
+      return true
+    }
+    // macOS full chromium lives inside the .app bundle.
+    if (process.platform === "darwin" &&
+        fs.existsSync(path.join(folder, "Chromium.app", "Contents", "MacOS", "Chromium"))) {
+      return true
+    }
+  }
+  return false
 }
 
-// A Chromium install is only usable if extraction finished. The pre-1.60
-// Playwright extraction bug on Node >=24.16 left the main binary in place but
-// dropped companion files, so on Windows we also require icudtl.dat (one of the
-// files that went missing) before trusting the install.
-function installComplete(revDir) {
-  const exe = chromiumExecutableUnder(revDir)
-  if (!exe) return false
-  if (process.platform === "win32") {
-    return fs.existsSync(path.join(path.dirname(exe), "icudtl.dat"))
-  }
-  return true
-}
-
+// True only if every required Chromium component is present and fully extracted.
 function hasChromium(dir) {
   try {
     if (!dir || !fs.existsSync(dir)) return false
-    const rev = expectedChromiumRevision()
-    if (rev) return installComplete(path.join(dir, `chromium-${rev}`))
-    // Revision unknown — accept any complete chromium-<n> install in the dir.
-    return fs.readdirSync(dir)
-      .filter((name) => /^chromium-\d+$/.test(name))
-      .some((name) => installComplete(path.join(dir, name)))
+    const components = requiredChromiumComponents(readBrowsersJson())
+    if (components.length === 0) return false
+    return components.every((c) => componentComplete(dir, c.name, c.revision))
   } catch {
     return false
   }
