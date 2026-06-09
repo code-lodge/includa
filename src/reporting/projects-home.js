@@ -49,6 +49,7 @@ main{max-width:1400px;margin:0 auto;padding:2rem}
 .status-completed{background:rgba(34,197,94,.15);color:var(--completed)}
 .status-stopped{background:rgba(245,158,11,.15);color:var(--stopped)}
 .status-failed{background:rgba(239,68,68,.15);color:var(--critical)}
+.card-error{font-size:.78rem;color:var(--critical);background:rgba(239,68,68,.08);border:1px solid rgba(239,68,68,.25);border-radius:.4rem;padding:.4rem .55rem;word-break:break-word}
 .btn{display:inline-flex;align-items:center;gap:.35rem;padding:.4rem .9rem;border-radius:.4rem;font-size:.8rem;font-weight:500;cursor:pointer;border:1px solid transparent;transition:opacity .15s,background .15s;text-decoration:none;white-space:nowrap}
 .btn:hover{opacity:.85}
 .btn-sm{padding:.3rem .7rem;font-size:.78rem}
@@ -252,6 +253,10 @@ function renderCardHtml(p) {
     ? '<button class="btn btn-sm" data-action="resume" data-id="' + p.id + '">Resume</button>'
     : ''
 
+  var errBlock = (!p.scanRunning && p.lastScanStatus === 'failed' && p.lastScanError)
+    ? '<div class="card-error" role="alert">⚠ ' + escHtml(p.lastScanError) + '</div>'
+    : ''
+
   return '<div class="card" id="card-' + p.id + '" data-id="' + p.id + '">' +
     '<div class="card-header">' +
       '<div class="card-title">' + escHtml(p.name) + '</div>' +
@@ -259,6 +264,7 @@ function renderCardHtml(p) {
     '</div>' +
     '<div class="card-url">' + escHtml(p.url) + '</div>' +
     '<div class="card-stats">' + (stats ? '<span>' + stats + '</span>' : '') + '<span>' + lastScan + '</span></div>' +
+    errBlock +
     '<div class="card-actions">' +
       startBtn + resumeBtn + dashLink + exportBtn +
       '<button class="btn btn-sm btn-ghost" data-action="edit" data-id="' + p.id + '" data-name="' + escHtml(p.name) + '" data-url="' + escHtml(p.url) + '">Edit</button>' +
@@ -323,6 +329,9 @@ function renderCardHtml(p) {
   const resumeBtn = !p.scanRunning && p.lastScanStatus === "stopped"
     ? `<button class="btn btn-sm" data-action="resume" data-id="${p.id}">Resume</button>`
     : ""
+  const errBlock = !p.scanRunning && p.lastScanStatus === "failed" && p.lastScanError
+    ? `<div class="card-error" role="alert">⚠ ${escHtml(p.lastScanError)}</div>`
+    : ""
 
   return `<div class="card" id="card-${p.id}" data-id="${p.id}">
   <div class="card-header">
@@ -331,6 +340,7 @@ function renderCardHtml(p) {
   </div>
   <div class="card-url">${escHtml(p.url)}</div>
   <div class="card-stats">${stats ? `<span>${stats}</span>` : ""}<span>${lastScan}</span></div>
+  ${errBlock}
   <div class="card-actions">
     ${startBtn}${resumeBtn}${dashLink}${exportBtn}
     <button class="btn btn-sm btn-ghost" data-action="edit" data-id="${p.id}" data-name="${escHtml(p.name)}" data-url="${escHtml(p.url)}">Edit</button>

@@ -101,11 +101,25 @@ async function clearResumeState(reportDir) {
 }
 
 export async function runScan(targetUrl, options, signal) {
+  const reportDir = path.resolve(options.reportDir)
+  // Create the live-state tracker before anything that can fail, so an error
+  // anywhere in the pipeline (e.g. the browser engine missing) is reported to
+  // the dashboard's live view instead of vanishing into an invisible
+  // console.log. setStatus mutates the shared state object, so it survives any
+  // already-scheduled flush.
+  const liveTracker = await createLiveStateTracker(reportDir, targetUrl, { projectId: options.projectId ?? null, projectUrl: options.projectUrl ?? null })
+  try {
+    return await executeScan(targetUrl, options, signal, { reportDir, liveTracker })
+  } catch (err) {
+    try { await liveTracker.setStatus("failed", `Scan failed: ${err.message}`) } catch { /* ignore */ }
+    throw err
+  }
+}
+
+async function executeScan(targetUrl, options, signal, { reportDir, liveTracker }) {
   const logger = createLogger()
   const formats = parseFormats(options.format)
-  const reportDir = path.resolve(options.reportDir)
   const manualChecklist = buildManualChecklist(options.wcagLevel)
-  const liveTracker = await createLiveStateTracker(reportDir, targetUrl, { projectId: options.projectId ?? null, projectUrl: options.projectUrl ?? null })
   await liveTracker.setChecklist(options.wcagLevel, manualChecklist)
 
   const resumeState = await loadResumeState(reportDir)

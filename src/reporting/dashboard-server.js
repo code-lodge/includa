@@ -196,13 +196,14 @@ export async function serveDashboard({ dataDir, port, defaultOptions = {}, initi
           lastScanStatus: result.stopped ? "stopped" : "completed",
           lastViolations: result.summary?.totalViolations ?? null,
           lastPages: result.summary?.scannedPages ?? null,
-          lastScanDir: scanDir
+          lastScanDir: scanDir,
+          lastScanError: null
         })
       })
       .catch(async (err) => {
         console.log(`\n[project:${project.id}] Scan failed: ${err.message}`)
         if (err.stack) console.log(err.stack)
-        await store.update(project.id, { lastScanStatus: "failed" })
+        await store.update(project.id, { lastScanStatus: "failed", lastScanError: err.message })
       })
       .finally(() => {
         state.scanRunning = false
@@ -330,12 +331,13 @@ export async function serveDashboard({ dataDir, port, defaultOptions = {}, initi
               await store.update(project.id, {
                 lastScanStatus: result.stopped ? "stopped" : "completed",
                 lastViolations: result.summary?.totalViolations ?? null,
-                lastPages: result.summary?.scannedPages ?? null
+                lastPages: result.summary?.scannedPages ?? null,
+                lastScanError: null
               })
             })
             .catch(async (err) => {
               console.log(`\n[project:${project.id}] Resume failed: ${err.message}`)
-              await store.update(project.id, { lastScanStatus: "failed" })
+              await store.update(project.id, { lastScanStatus: "failed", lastScanError: err.message })
             })
             .finally(() => {
               state.scanRunning = false
