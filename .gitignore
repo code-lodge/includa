@@ -28,5 +28,8 @@ Thumbs.db
 playwright-report/
 test-results/
 
+# Bundled Chromium downloaded at build time (shipped via extraResources)
+electron/pw-browsers/
+
 # Claude Code worktrees (nested git repos — never commit these)
 .claude/

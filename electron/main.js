@@ -51,16 +51,29 @@ async function bootstrap() {
   mainWindow.once("ready-to-show", () => mainWindow.show())
   await mainWindow.loadFile(path.join(__dirname, "loading.html"))
 
-  // First-run: install Playwright Chromium if missing.
-  const { ensureBrowsersAsync } = await import("../src/setup/ensure-browsers.js")
+  // Resolve the Chromium engine that scanning needs. We ship a matching build
+  // inside the installer (extraResources -> resources/pw-browsers); if that copy
+  // is ever missing we fall back to downloading the matching revision into the
+  // writable user-data dir. ensureChromiumForElectron sets PLAYWRIGHT_BROWSERS_PATH
+  // so the in-process scan (crawler + scanner) finds the browser.
+  const bundledDir = app.isPackaged
+    ? path.join(process.resourcesPath, "pw-browsers")
+    : path.join(__dirname, "pw-browsers")
+  const downloadDir = path.join(app.getPath("userData"), "pw-browsers")
+
+  const { ensureChromiumForElectron } = await import("../src/setup/ensure-browsers.js")
   try {
-    await ensureBrowsersAsync((line) => {
-      mainWindow.webContents.send("setup:log", line)
+    await ensureChromiumForElectron({
+      bundledDir,
+      downloadDir,
+      onProgress: (line) => mainWindow.webContents.send("setup:log", line)
     })
   } catch (err) {
     dialog.showErrorBox(
       "Setup failed",
-      `Could not install the Chromium browser engine.\n\n${err.message}\n\nYou can install it manually with:\n  npx playwright install chromium`
+      `Could not prepare the Chromium browser engine that scanning needs.\n\n${err.message}\n\n` +
+        "If this machine is offline or behind a restrictive proxy, connect to the internet and reopen Includa, " +
+        "or reinstall the app to restore the bundled browser."
     )
     app.quit()
     return
