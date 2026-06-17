@@ -1,8 +1,10 @@
 #!/usr/bin/env node
 
+import path from "node:path"
 import { Command } from "commander"
 import { runScan } from "../src/index.js"
 import { serveDashboard } from "../src/reporting/dashboard-server.js"
+import { logBus } from "../src/utils/log-bus.js"
 
 function parseNumber(value, fallback) {
   const parsed = Number.parseInt(value, 10)
@@ -64,6 +66,7 @@ program
     }
 
     if (options.dashboard) {
+      logBus.configureFile(path.join(options.dataDir, "logs"))
       await serveDashboard({
         dataDir: options.dataDir,
         port: options.port,

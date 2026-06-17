@@ -73,11 +73,13 @@ src/
     template-report.js     — Per-template detail reports
     json-export.js         — JSON/CSV export
     live-state.js          — Real-time scan state tracking (writes live-state.json)
-    dashboard-server.js    — HTTP server for dashboard + scan API endpoints
+    dashboard-server.js    — HTTP server for dashboard + scan API + log stream (SSE)
   store/
     db.js              — SQLite-backed page result store (better-sqlite3)
   utils/
-    logger.js          — Console logger with timestamps
+    logger.js          — Console logger with timestamps (also feeds the log bus)
+    log-bus.js         — Central log store: ring buffer + rotating file + event stream
+    console-capture.js — Wraps console.* so all output flows into the log bus
     url-utils.js       — URL normalization, slugging, HTML escaping
 ```
 
@@ -96,6 +98,7 @@ src/
 - `escapeHtml()` from `utils/url-utils.js` must be used for all user-controlled content in HTML output.
 - Impact levels: `critical`, `serious`, `moderate`, `minor`, `unknown` — this ordering is used everywhere.
 - CMS detection modules in `src/analysis/cms/` export `{ detect, classify }` functions.
+- Logging funnels through `logBus` (`utils/log-bus.js`). The Electron app and `node bin/includa.js --dashboard` surface it as the in-app **Console** (live via SSE at `/api/logs/stream`, copy/export at `/api/logs.txt`) plus a rotating file at `<userData>/logs/includa.log`. Setup failures render on the splash with a Retry button rather than a dead-end dialog.
 
 ## Common pitfalls
 

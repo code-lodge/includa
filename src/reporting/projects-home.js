@@ -68,6 +68,28 @@ input[type=text],input[type=url]{width:100%;background:#0f1117;border:1px solid 
 input:focus{border-color:var(--accent)}
 .modal-footer{display:flex;justify-content:flex-end;gap:.5rem;margin-top:.25rem}
 .error-msg{color:var(--critical);font-size:.8rem;min-height:1rem}
+/* --- Log console drawer --- */
+.console-toggle{margin-left:auto;position:relative}
+.console-badge{display:none;margin-left:.4rem;min-width:1.15rem;height:1.15rem;padding:0 .3rem;border-radius:9999px;background:var(--critical);color:#fff;font-size:.68rem;line-height:1.15rem;text-align:center;font-weight:700}
+.console-badge.visible{display:inline-block}
+.console-drawer{position:fixed;left:0;right:0;bottom:0;height:42vh;min-height:240px;background:var(--panel);border-top:1px solid var(--border);box-shadow:0 -8px 24px rgba(0,0,0,.4);display:flex;flex-direction:column;transform:translateY(101%);transition:transform .2s ease;z-index:200}
+.console-drawer.open{transform:translateY(0)}
+.console-head{display:flex;align-items:center;gap:.5rem;padding:.5rem .75rem;border-bottom:1px solid var(--border);flex-wrap:wrap}
+.console-head h3{font-size:.85rem;font-weight:600;margin-right:.25rem}
+.console-head select,.console-head input[type=text]{background:#0f1117;border:1px solid var(--border);border-radius:.35rem;color:var(--text);font-size:.78rem;padding:.32rem .5rem;outline:none}
+.console-head input[type=text]{flex:1;min-width:120px}
+.console-head input:focus,.console-head select:focus{border-color:var(--accent)}
+.console-head .spacer{flex-basis:100%;height:0}
+.console-head label.inline{display:inline-flex;align-items:center;gap:.3rem;font-size:.75rem;color:var(--muted);margin:0}
+.console-body{flex:1;overflow:auto;padding:.5rem .75rem;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:.74rem;line-height:1.5}
+.cl{white-space:pre-wrap;word-break:break-word;display:flex;gap:.55rem}
+.cl .t{color:var(--muted);opacity:.55;flex-shrink:0}
+.cl .s{color:var(--muted);opacity:.85;flex-shrink:0}
+.cl.error .m{color:var(--critical)}
+.cl.warn .m{color:var(--serious)}
+.cl.success .m{color:var(--completed)}
+.cl.debug{opacity:.65}
+.console-empty{color:var(--muted);padding:1.5rem;text-align:center;font-size:.82rem}
 </style>
 </head>
 <body>
@@ -76,6 +98,9 @@ input:focus{border-color:var(--accent)}
     <h1>Includa</h1>
     <div class="subtitle">Accessibility Scanner</div>
   </div>
+  <button class="btn btn-ghost console-toggle" id="consoleToggle" title="Show the log console (errors, warnings, scan output) — Ctrl+\`">
+    Console<span class="console-badge" id="consoleBadge">0</span>
+  </button>
 </header>
 <main>
   <div class="toolbar">
@@ -299,6 +324,122 @@ function renderGrid(projects) {
 }
 
 setInterval(refreshProjects, POLL_INTERVAL)
+</script>
+
+<div class="console-drawer" id="consoleDrawer" role="region" aria-label="Log console">
+  <div class="console-head">
+    <h3>Console</h3>
+    <select id="consoleLevel" title="Minimum level to show">
+      <option value="0">All</option>
+      <option value="1" selected>Info &amp; up</option>
+      <option value="2">Warnings &amp; up</option>
+      <option value="3">Errors only</option>
+    </select>
+    <input type="text" id="consoleSearch" placeholder="Filter text…" autocomplete="off">
+    <label class="inline"><input type="checkbox" id="consoleAutoscroll" checked> Autoscroll</label>
+    <span class="spacer"></span>
+    <button class="btn btn-sm btn-ghost" id="consoleCopy">Copy</button>
+    <a class="btn btn-sm btn-ghost" href="/api/logs.txt" download="includa-logs.txt">Download</a>
+    <button class="btn btn-sm btn-ghost" id="consoleClear">Clear view</button>
+    <button class="btn btn-sm btn-ghost" id="consoleClose">Close</button>
+  </div>
+  <div class="console-body" id="consoleBody"></div>
+</div>
+
+<script>
+(function() {
+  var drawer = document.getElementById('consoleDrawer')
+  var badge = document.getElementById('consoleBadge')
+  var body = document.getElementById('consoleBody')
+  var levelSel = document.getElementById('consoleLevel')
+  var searchEl = document.getElementById('consoleSearch')
+  var autoscrollEl = document.getElementById('consoleAutoscroll')
+  var RANK = { debug: 0, info: 1, success: 1, warn: 2, error: 3 }
+  var MAX = 2000
+  var entries = []
+  var unread = 0
+  var open = false
+
+  function passes(e) {
+    if ((RANK[e.level] != null ? RANK[e.level] : 1) < Number(levelSel.value)) return false
+    var q = searchEl.value.trim().toLowerCase()
+    if (q && ((e.message || '') + ' ' + (e.source || '')).toLowerCase().indexOf(q) === -1) return false
+    return true
+  }
+
+  function fmtTime(iso) {
+    var d = new Date(iso)
+    if (isNaN(d.getTime())) return ''
+    function p(n) { return (n < 10 ? '0' : '') + n }
+    return p(d.getHours()) + ':' + p(d.getMinutes()) + ':' + p(d.getSeconds())
+  }
+
+  function lineHtml(e) {
+    return '<div class="cl ' + (e.level || 'info') + '">' +
+      '<span class="t">' + fmtTime(e.at) + '</span>' +
+      '<span class="s">' + escHtml(e.source || '') + '</span>' +
+      '<span class="m">' + escHtml(e.message || '') + '</span>' +
+    '</div>'
+  }
+
+  function render() {
+    var visible = entries.filter(passes)
+    if (visible.length === 0) {
+      body.innerHTML = '<div class="console-empty">No log entries match the current filter.</div>'
+      return
+    }
+    var html = ''
+    for (var i = 0; i < visible.length; i++) html += lineHtml(visible[i])
+    body.innerHTML = html
+    if (autoscrollEl.checked) body.scrollTop = body.scrollHeight
+  }
+
+  function addEntry(e) {
+    entries.push(e)
+    if (entries.length > MAX) entries.shift()
+    if (open && passes(e)) {
+      var empty = body.querySelector('.console-empty')
+      if (empty) body.innerHTML = ''
+      body.insertAdjacentHTML('beforeend', lineHtml(e))
+      if (autoscrollEl.checked) body.scrollTop = body.scrollHeight
+    } else if (!open && e.level === 'error') {
+      unread++
+      badge.textContent = unread > 99 ? '99+' : String(unread)
+      badge.classList.add('visible')
+    }
+  }
+
+  function openDrawer() { open = true; drawer.classList.add('open'); unread = 0; badge.classList.remove('visible'); render() }
+  function closeDrawer() { open = false; drawer.classList.remove('open') }
+  function toggleDrawer() { if (open) closeDrawer(); else openDrawer() }
+
+  document.getElementById('consoleToggle').addEventListener('click', toggleDrawer)
+  document.getElementById('consoleClose').addEventListener('click', closeDrawer)
+  document.getElementById('consoleClear').addEventListener('click', function() { entries = []; render() })
+  levelSel.addEventListener('change', render)
+  searchEl.addEventListener('input', render)
+
+  document.getElementById('consoleCopy').addEventListener('click', function() {
+    var btn = this
+    var text = entries.filter(passes).map(function(e) {
+      return e.at + ' [' + String(e.level || 'info').toUpperCase() + '] ' + (e.source || '') + ': ' + (e.message || '')
+    }).join('\\n')
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(text).then(function() {
+        btn.textContent = 'Copied!'; setTimeout(function() { btn.textContent = 'Copy' }, 1500)
+      }, function() {})
+    }
+  })
+
+  document.addEventListener('keydown', function(e) {
+    if ((e.ctrlKey || e.metaKey) && e.key === '\`') { e.preventDefault(); toggleDrawer() }
+  })
+
+  try {
+    var es = new EventSource('/api/logs/stream')
+    es.onmessage = function(ev) { try { addEntry(JSON.parse(ev.data)) } catch (_e) {} }
+  } catch (_e) {}
+})()
 </script>
 </body>
 </html>`

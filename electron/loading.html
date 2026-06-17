@@ -11,11 +11,14 @@
     --accent: #2dd4bf;
     --text: #e2e8f0;
     --muted: #8892a4;
+    --error: #ef4444;
+    --warn: #f97316;
+    --success: #22c55e;
   }
   * { box-sizing: border-box; }
   html, body { margin: 0; padding: 0; height: 100%; background: var(--bg); color: var(--text); font-family: system-ui, -apple-system, sans-serif; }
   body { display: flex; align-items: center; justify-content: center; }
-  .splash { width: 460px; max-width: 90vw; text-align: center; padding: 2rem; }
+  .splash { width: 560px; max-width: 92vw; text-align: center; padding: 2rem; }
   h1 { margin: 0 0 0.4rem; font-size: 1.6rem; font-weight: 600; }
   .subtitle { color: var(--muted); font-size: 0.9rem; margin-bottom: 2rem; }
   .spinner {
@@ -23,9 +26,13 @@
     border: 3px solid var(--border); border-top-color: var(--accent);
     border-radius: 50%; animation: spin 0.8s linear infinite;
   }
+  .spinner.hidden { display: none; }
   @keyframes spin { to { transform: rotate(360deg); } }
-  .status { font-size: 0.95rem; color: var(--text); margin-bottom: 0.5rem; min-height: 1.4em; }
-  .detail { font-size: 0.8rem; color: var(--muted); min-height: 1.2em; }
+  .fail-icon { display: none; width: 44px; height: 44px; margin: 0 auto 1rem; border-radius: 50%; background: rgba(239,68,68,.15); color: var(--error); font-size: 1.6rem; line-height: 44px; }
+  .fail-icon.visible { display: block; }
+  .status { font-size: 1.05rem; color: var(--text); margin-bottom: 0.5rem; min-height: 1.4em; font-weight: 600; }
+  .status.error { color: var(--error); }
+  .detail { font-size: 0.85rem; color: var(--muted); min-height: 1.2em; white-space: pre-wrap; }
   .log {
     margin-top: 1.5rem;
     text-align: left;
@@ -36,29 +43,76 @@
     font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
     font-size: 0.72rem;
     color: var(--muted);
-    max-height: 140px;
+    max-height: 200px;
     overflow: auto;
     display: none;
   }
   .log.visible { display: block; }
-  .log-line { white-space: pre-wrap; word-break: break-word; line-height: 1.45; }
+  .log-line { white-space: pre-wrap; word-break: break-word; line-height: 1.5; }
+  .log-line .src { color: var(--muted); opacity: .7; }
+  .lvl-error { color: var(--error); }
+  .lvl-warn { color: var(--warn); }
+  .lvl-success { color: var(--success); }
+  .lvl-info { color: var(--text); }
+  .lvl-debug { color: var(--muted); opacity: .8; }
+  .actions { display: none; gap: 0.6rem; justify-content: center; margin-top: 1.25rem; }
+  .actions.visible { display: flex; }
+  button {
+    font: inherit; font-size: 0.85rem; font-weight: 500; cursor: pointer;
+    padding: 0.5rem 1.1rem; border-radius: 0.4rem; border: 1px solid var(--border);
+    background: transparent; color: var(--text); transition: opacity .15s, background .15s;
+  }
+  button:hover { opacity: 0.85; }
+  button.primary { background: var(--accent); color: #04201c; border-color: var(--accent); }
+  button.danger { color: var(--error); border-color: rgba(239,68,68,.35); }
 </style>
 </head>
 <body>
 <div class="splash">
-  <div class="spinner" aria-hidden="true"></div>
+  <div class="spinner" id="spinner" aria-hidden="true"></div>
+  <div class="fail-icon" id="failIcon" aria-hidden="true">!</div>
   <h1>Includa</h1>
   <div class="subtitle">Accessibility scanner for large websites</div>
   <div class="status" id="status">Starting…</div>
   <div class="detail" id="detail">Preparing the dashboard server</div>
   <div class="log" id="log" aria-live="polite"></div>
+  <div class="actions" id="actions">
+    <button class="primary" id="retryBtn">Retry</button>
+    <button id="copyBtn">Copy log</button>
+    <button class="danger" id="quitBtn">Quit</button>
+  </div>
 </div>
 <script>
   var statusEl = document.getElementById('status')
   var detailEl = document.getElementById('detail')
   var logEl = document.getElementById('log')
+  var spinnerEl = document.getElementById('spinner')
+  var failIconEl = document.getElementById('failIcon')
+  var actionsEl = document.getElementById('actions')
   var sawSetup = false
 
+  function levelClass(level) {
+    if (level === 'error' || level === 'warn' || level === 'success' || level === 'debug' || level === 'info') {
+      return 'lvl-' + level
+    }
+    return 'lvl-info'
+  }
+
+  function appendLine(text, level, source) {
+    var div = document.createElement('div')
+    div.className = 'log-line ' + levelClass(level)
+    if (source) {
+      var src = document.createElement('span')
+      src.className = 'src'
+      src.textContent = source + ': '
+      div.appendChild(src)
+    }
+    div.appendChild(document.createTextNode(text))
+    logEl.appendChild(div)
+    logEl.scrollTop = logEl.scrollHeight
+  }
+
+  // Live install progress (first-time Chromium download).
   function appendLog(line) {
     if (!sawSetup) {
       sawSetup = true
@@ -66,19 +120,63 @@
       detailEl.textContent = 'Downloading the Chromium browser engine. This only happens once and may take a couple of minutes.'
       logEl.classList.add('visible')
     }
-    line.split(/\r?\n/).forEach(function(part) {
+    String(line).split(/\r?\n/).forEach(function(part) {
       var trimmed = part.trim()
-      if (!trimmed) return
-      var div = document.createElement('div')
-      div.className = 'log-line'
-      div.textContent = trimmed
-      logEl.appendChild(div)
-      logEl.scrollTop = logEl.scrollHeight
+      if (trimmed) appendLine(trimmed, 'info')
     })
   }
 
-  if (window.a11yScanSetup && typeof window.a11yScanSetup.onLog === 'function') {
-    window.a11yScanSetup.onLog(appendLog)
+  function showFailure(payload) {
+    payload = payload || {}
+    spinnerEl.classList.add('hidden')
+    failIconEl.classList.add('visible')
+    statusEl.classList.add('error')
+    statusEl.textContent = 'Setup failed'
+    detailEl.textContent = payload.message || 'Includa could not finish starting up.'
+
+    logEl.innerHTML = ''
+    logEl.classList.add('visible')
+    var logs = payload.logs || []
+    if (logs.length === 0) {
+      appendLine('No log output was captured.', 'debug')
+    } else {
+      logs.forEach(function(e) { appendLine(e.message, e.level, e.source) })
+    }
+    actionsEl.classList.add('visible')
+  }
+
+  function collectLogText() {
+    var lines = []
+    var nodes = logEl.querySelectorAll('.log-line')
+    for (var i = 0; i < nodes.length; i++) lines.push(nodes[i].textContent)
+    return lines.join('\n')
+  }
+
+  document.getElementById('retryBtn').addEventListener('click', function() {
+    statusEl.classList.remove('error')
+    statusEl.textContent = 'Retrying…'
+    actionsEl.classList.remove('visible')
+    failIconEl.classList.remove('visible')
+    spinnerEl.classList.remove('hidden')
+    if (window.includaSetup && window.includaSetup.retry) window.includaSetup.retry()
+  })
+
+  document.getElementById('copyBtn').addEventListener('click', function() {
+    var text = collectLogText()
+    var btn = document.getElementById('copyBtn')
+    function done() { btn.textContent = 'Copied!'; setTimeout(function() { btn.textContent = 'Copy log' }, 1500) }
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(text).then(done, function() {})
+    }
+  })
+
+  document.getElementById('quitBtn').addEventListener('click', function() {
+    if (window.includaSetup && window.includaSetup.quit) window.includaSetup.quit()
+  })
+
+  if (window.includaSetup) {
+    if (typeof window.includaSetup.onLog === 'function') window.includaSetup.onLog(appendLog)
+    if (typeof window.includaSetup.onFailed === 'function') window.includaSetup.onFailed(showFailure)
   }
 </script>
 </body>

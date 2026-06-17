@@ -2,6 +2,7 @@ import fs from "node:fs/promises"
 import http from "node:http"
 import path from "node:path"
 import { runScan } from "../index.js"
+import { logBus, MAX_ENTRIES } from "../utils/log-bus.js"
 import { writeDashboard } from "./html-dashboard.js"
 import { ProjectStore } from "../store/project-store.js"
 import { renderProjectsHome } from "./projects-home.js"
@@ -231,6 +232,45 @@ export async function serveDashboard({ dataDir, port, defaultOptions = {}, initi
         scanRunning: getState(p.id).scanRunning
       }))
       sendHtml(res, renderProjectsHome(augmented))
+      return
+    }
+
+    // --- GET /api/logs/stream — Server-Sent Events: backlog then live tail ---
+    if (req.method === "GET" && url.startsWith("/api/logs/stream")) {
+      res.writeHead(200, {
+        "content-type": "text/event-stream; charset=utf-8",
+        "cache-control": "no-cache, no-transform",
+        "connection": "keep-alive",
+        "x-accel-buffering": "no"
+      })
+      res.write("retry: 3000\n\n")
+      const send = (entry) => {
+        try { res.write(`data: ${JSON.stringify(entry)}\n\n`) } catch { /* client gone */ }
+      }
+      for (const entry of logBus.recent(500)) send(entry)
+      const onEntry = (entry) => send(entry)
+      logBus.on("entry", onEntry)
+      const heartbeat = setInterval(() => {
+        try { res.write(": ping\n\n") } catch { /* ignore */ }
+      }, 25000)
+      req.on("close", () => {
+        clearInterval(heartbeat)
+        logBus.off("entry", onEntry)
+      })
+      return
+    }
+
+    // --- GET /api/logs.txt — plain-text dump for copy / export ---
+    if (req.method === "GET" && url.startsWith("/api/logs.txt")) {
+      const text = logBus.recent(MAX_ENTRIES)
+        .map((e) => `${e.at} [${e.level.toUpperCase()}] ${e.source}: ${e.message}`)
+        .join("\n")
+      res.writeHead(200, {
+        "content-type": "text/plain; charset=utf-8",
+        "cache-control": "no-store",
+        "content-disposition": "attachment; filename=\"includa-logs.txt\""
+      })
+      res.end(text)
       return
     }
 
