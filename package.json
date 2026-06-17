@@ -43,6 +43,7 @@
     "scan": "node ./bin/includa.js",
     "start": "electron .",
     "electron:dev": "electron .",
+    "rebuild": "electron-builder install-app-deps",
     "build": "node scripts/install-browser.cjs && electron-builder",
     "build:win": "node scripts/install-browser.cjs && electron-builder --win",
     "build:mac": "node scripts/install-browser.cjs && electron-builder --mac",
@@ -51,10 +52,11 @@
   "dependencies": {
     "@axe-core/playwright": "^4.8.0",
     "axe-core": "^4.11.2",
-    "better-sqlite3": "^11.0.0",
+    "better-sqlite3": "^12.11.1",
     "chalk": "^5.3.0",
     "commander": "^11.0.0",
     "playwright": "^1.60.0",
+    "playwright-core": "^1.60.0",
     "xml2js": "^0.6.2"
   },
   "devDependencies": {
@@ -66,7 +68,7 @@
     "appId": "com.code-lodge.includa",
     "productName": "Includa",
     "asar": true,
-    "npmRebuild": false,
+    "npmRebuild": true,
     "asarUnpack": [
       "node_modules/playwright-core/**/*",
       "node_modules/playwright/**/*"

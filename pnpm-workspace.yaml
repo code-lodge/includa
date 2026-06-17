@@ -1,0 +1,10 @@
+# Flat node_modules, like npm. Electron + electron-builder (asar packing,
+# asarUnpack globs, native-module handling) and our require.resolve() of
+# playwright-core all assume hoisted/top-level packages. Without this, pnpm's
+# default symlinked layout hides transitive deps (e.g. playwright-core) and
+# breaks both `pnpm start` and the packaged build.
+nodeLinker: hoisted
+
+allowBuilds:
+  better-sqlite3: true
+  electron-winstaller: true

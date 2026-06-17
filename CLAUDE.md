@@ -5,20 +5,32 @@
 Open-source WCAG 2.0/2.1/2.2 accessibility scanner for large websites. Uses Playwright for crawling and axe-core for violation detection. Outputs HTML dashboards, static reports, JSON, and CSV.
 
 - **Language:** JavaScript (ESM, Node >= 18)
-- **No build step** — run source directly with `node`
+- **Package manager:** pnpm. `nodeLinker: hoisted` (in `pnpm-workspace.yaml`) keeps `node_modules` flat, which electron-builder and our `require.resolve("playwright-core/…")` rely on.
+- **No build step for the source** — run it directly with `node` / `electron`
 - **No test framework** — validate with `node -c <file>` for syntax, manual scans for behavior
 
 ## Quick reference
 
 ```bash
 # Install dependencies
-npm install
+pnpm install
 
-# Run a scan
+# Rebuild native modules (better-sqlite3) for Electron's ABI — REQUIRED after a
+# fresh install before launching the desktop app. The CLI (node bin/includa.js)
+# instead needs them built for Node, so one checkout's binary can't serve both.
+pnpm run rebuild
+
+# Launch the desktop app (Electron)
+pnpm start
+
+# Run a scan from the CLI
 node bin/includa.js <url> [options]
 
-# Start the dashboard server (serves reports + scan UI)
-node bin/includa.js dashboard --port 3000
+# Serve the dashboard from the CLI (multi-project UI)
+node bin/includa.js --dashboard --port 3000
+
+# Build packaged installers (Windows: NSIS + MSI + portable)
+pnpm run build:win
 
 # Syntax-check a file
 node -c src/reporting/static-report.js
