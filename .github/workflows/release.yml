@@ -46,7 +46,8 @@ jobs:
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          # pnpm 11.7+ requires Node >= 22.13 (it uses the node:sqlite builtin).
+          node-version: '22'
           cache: 'pnpm'
 
       # better-sqlite3 / electron-winstaller build scripts are pre-approved via
