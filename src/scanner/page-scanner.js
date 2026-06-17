@@ -120,8 +120,13 @@ const STABILIZATION_DELAY_MS = 500
 // 430 (Shopify's request-throttle code), 503 Service Unavailable.
 const THROTTLE_STATUSES = new Set([429, 430, 503])
 const RETRY_BASE_MS = 1000
-const RETRY_MAX_MS = 15000
-const RETRY_AFTER_CAP_MS = 30000
+const RETRY_MAX_MS = 20000
+const RETRY_AFTER_CAP_MS = 60000
+const DEFAULT_MAX_RETRIES = 5
+// A rate-limit "please wait" interstitial is a near-empty shim. We treat a page
+// as an interstitial only if it has a meta-refresh AND very little visible text,
+// so real content pages with a (legitimate) meta-refresh are still reported.
+const INTERSTITIAL_MAX_TEXT = 2000
 
 // How long to wait before the next attempt. Honour a Retry-After header when the
 // origin sends one (capped), otherwise exponential backoff with a little jitter
@@ -134,26 +139,30 @@ function backoffDelay(attempt, retryAfterHeader) {
   return Math.min(RETRY_BASE_MS * 2 ** attempt, RETRY_MAX_MS) + Math.floor(Math.random() * 500)
 }
 
-// A meta-refresh is the tell-tale of a rate-limit / "please wait" interstitial
-// (e.g. Shopify) — and it's the very thing that trips a false-positive critical
-// meta-refresh violation. Returns the refresh delay in seconds, or null if none.
-async function detectMetaRefreshSeconds(page) {
+// Inspect the loaded page for the rate-limit interstitial signature: a
+// meta-refresh on a near-empty "please wait" page. Returns the refresh delay in
+// seconds (null if no meta-refresh) and the length of the visible body text.
+async function inspectInterstitial(page) {
   return page.evaluate(() => {
     const m = document.querySelector('meta[http-equiv="refresh" i]')
-    if (!m) return null
-    const secs = parseInt(m.getAttribute("content") || "", 10)
-    return Number.isFinite(secs) ? secs : 0
-  }).catch(() => null)
+    const secs = m ? parseInt(m.getAttribute("content") || "", 10) : null
+    return {
+      metaRefresh: m ? (Number.isFinite(secs) ? secs : 0) : null,
+      textLength: document.body && document.body.innerText ? document.body.innerText.trim().length : 0
+    }
+  }).catch(() => ({ metaRefresh: null, textLength: 0 }))
 }
 
 // Navigate to `url`, retrying with backoff while the response looks rate-limited
-// — a throttling status or a meta-refresh interstitial. Retrying lets a transient
-// rate limit clear so we scan the real page instead of the "please wait" shim.
-// Note: a plain "never reached network-idle" is deliberately NOT retried on its
-// own — many JS-heavy pages legitimately never idle, and retrying every one would
-// cripple a full-site scan. Bounded by options.maxRetries (default 3).
+// — a throttling status, or a meta-refresh interstitial (a near-empty "please
+// wait" shim). Retrying lets a transient rate limit clear so we scan the real
+// page. `rateLimited` is true only when retries were exhausted and the page is
+// STILL an interstitial; the caller then records it as a failed (rate-limited)
+// scan rather than emitting the shim's bogus violations (e.g. meta-refresh).
+// A plain "never reached network-idle" is deliberately NOT retried on its own —
+// many JS-heavy pages legitimately never idle. Bounded by options.maxRetries.
 async function navigateWithRetry(page, url, options) {
-  const maxRetries = Number.isFinite(options.maxRetries) ? options.maxRetries : 3
+  const maxRetries = Number.isFinite(options.maxRetries) ? options.maxRetries : DEFAULT_MAX_RETRIES
   let attempt = 0
 
   while (true) {
@@ -177,21 +186,22 @@ async function navigateWithRetry(page, url, options) {
       .catch(() => { networkSettled = false })
 
     const status = typeof response?.status === "function" ? response.status() : 0
-    const metaRefresh = await detectMetaRefreshSeconds(page)
     const throttled = THROTTLE_STATUSES.has(status)
-    const rateLimited = throttled || metaRefresh !== null
+    const { metaRefresh, textLength } = await inspectInterstitial(page)
+    const interstitial = metaRefresh !== null && textLength < INTERSTITIAL_MAX_TEXT
+    const rateLimited = throttled || interstitial
+    const reason = throttled ? `HTTP ${status}` : `meta-refresh ${metaRefresh}s, ${textLength} chars`
 
     if (rateLimited && attempt < maxRetries) {
-      const reason = throttled ? `HTTP ${status}` : `meta-refresh ${metaRefresh}s`
       const retryAfter = typeof response?.headers === "function" ? response.headers()["retry-after"] : undefined
       const delay = backoffDelay(attempt, retryAfter)
-      console.warn(`[retry] ${url}: looks rate-limited (${reason}); backing off ${delay}ms then retrying (attempt ${attempt + 1}/${maxRetries})`)
+      console.warn(`[retry] ${url}: rate-limited (${reason}); backing off ${delay}ms then retrying (attempt ${attempt + 1}/${maxRetries})`)
       await page.waitForTimeout(delay)
       attempt += 1
       continue
     }
 
-    return { networkSettled, attempts: attempt + 1, rateLimited }
+    return { networkSettled, attempts: attempt + 1, rateLimited, reason }
   }
 }
 
@@ -199,7 +209,16 @@ async function scanSinglePage(page, url, options) {
   const start = Date.now()
   await disableCache(page)
 
-  const { networkSettled, attempts, rateLimited } = await navigateWithRetry(page, url, options)
+  const { networkSettled, attempts, rateLimited, reason } = await navigateWithRetry(page, url, options)
+
+  // Still a rate-limit interstitial after every retry — don't scan the "please
+  // wait" shim (its meta-refresh would be a false-positive critical). Fail the
+  // page instead so it contributes no violations; lowering --concurrency is the
+  // real fix for sustained rate limiting.
+  if (rateLimited) {
+    console.warn(`[rate-limited] ${url}: gave up after ${attempts} attempts (${reason})`)
+    throw new Error(`Rate-limited: still a refresh interstitial after ${attempts} attempts (${reason}). Lower --concurrency and rescan.`)
+  }
 
   // Allow async rendering (JS frameworks, lazy hydration) to stabilise
   await page.waitForTimeout(STABILIZATION_DELAY_MS)

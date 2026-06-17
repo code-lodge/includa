@@ -156,7 +156,7 @@ export async function serveDashboard({ dataDir, port, defaultOptions = {}, initi
       depth: Number(merged.depth ?? 6),
       sampleTemplates: Number(merged.sampleTemplates ?? 0),
       timeout: Number(merged.timeout ?? 30000),
-      maxRetries: Number(merged.maxRetries ?? 3),
+      maxRetries: Number(merged.maxRetries ?? 5),
       headless: merged.headless ?? true,
       include: merged.include?.length ? merged.include : [],
       exclude: merged.exclude?.length ? merged.exclude : [],
