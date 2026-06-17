@@ -46,6 +46,7 @@ program
   .option("--format <formats>", "comma-separated: html,json,csv", "html,json,csv")
   .option("--sample-templates <number>", "Sample N pages per unique page structure (groups structurally similar pages); 0 = off", (v) => parseNumber(v, 0), 0)
   .option("--timeout <ms>", "page timeout in milliseconds", (v) => parseNumber(v, 30000), 30000)
+  .option("--max-retries <number>", "retry rate-limited pages (HTTP 429/430/503 or meta-refresh interstitial) up to N times with backoff", (v) => parseNumber(v, 3), 3)
   .option("--headless", "run browser in headless mode", true)
   .option("--no-headless", "run browser with UI")
   .option("--fail-on-critical", "exit code 2 when critical issues exist", false)

@@ -116,14 +116,90 @@ async function disableCache(page) {
 
 const STABILIZATION_DELAY_MS = 500
 
+// HTTP statuses that signal the origin is throttling us: 429 Too Many Requests,
+// 430 (Shopify's request-throttle code), 503 Service Unavailable.
+const THROTTLE_STATUSES = new Set([429, 430, 503])
+const RETRY_BASE_MS = 1000
+const RETRY_MAX_MS = 15000
+const RETRY_AFTER_CAP_MS = 30000
+
+// How long to wait before the next attempt. Honour a Retry-After header when the
+// origin sends one (capped), otherwise exponential backoff with a little jitter
+// so concurrent workers don't all retry in lockstep.
+function backoffDelay(attempt, retryAfterHeader) {
+  const retryAfter = Number(retryAfterHeader)
+  if (Number.isFinite(retryAfter) && retryAfter > 0) {
+    return Math.min(retryAfter * 1000, RETRY_AFTER_CAP_MS)
+  }
+  return Math.min(RETRY_BASE_MS * 2 ** attempt, RETRY_MAX_MS) + Math.floor(Math.random() * 500)
+}
+
+// A meta-refresh is the tell-tale of a rate-limit / "please wait" interstitial
+// (e.g. Shopify) — and it's the very thing that trips a false-positive critical
+// meta-refresh violation. Returns the refresh delay in seconds, or null if none.
+async function detectMetaRefreshSeconds(page) {
+  return page.evaluate(() => {
+    const m = document.querySelector('meta[http-equiv="refresh" i]')
+    if (!m) return null
+    const secs = parseInt(m.getAttribute("content") || "", 10)
+    return Number.isFinite(secs) ? secs : 0
+  }).catch(() => null)
+}
+
+// Navigate to `url`, retrying with backoff while the response looks rate-limited
+// — a throttling status or a meta-refresh interstitial. Retrying lets a transient
+// rate limit clear so we scan the real page instead of the "please wait" shim.
+// Note: a plain "never reached network-idle" is deliberately NOT retried on its
+// own — many JS-heavy pages legitimately never idle, and retrying every one would
+// cripple a full-site scan. Bounded by options.maxRetries (default 3).
+async function navigateWithRetry(page, url, options) {
+  const maxRetries = Number.isFinite(options.maxRetries) ? options.maxRetries : 3
+  let attempt = 0
+
+  while (true) {
+    let networkSettled = true
+    let response = null
+    try {
+      response = await page.goto(url, { waitUntil: "load", timeout: options.timeout })
+    } catch (err) {
+      // A failed navigation is itself a common throttling symptom — retry it too.
+      if (attempt < maxRetries) {
+        const delay = backoffDelay(attempt)
+        console.warn(`[retry] ${url}: navigation failed (${String(err.message).split("\n")[0]}); retrying in ${delay}ms (attempt ${attempt + 1}/${maxRetries})`)
+        await page.waitForTimeout(delay)
+        attempt += 1
+        continue
+      }
+      throw err
+    }
+
+    await page.waitForLoadState("networkidle", { timeout: Math.min(options.timeout, 7000) })
+      .catch(() => { networkSettled = false })
+
+    const status = typeof response?.status === "function" ? response.status() : 0
+    const metaRefresh = await detectMetaRefreshSeconds(page)
+    const throttled = THROTTLE_STATUSES.has(status)
+    const rateLimited = throttled || metaRefresh !== null
+
+    if (rateLimited && attempt < maxRetries) {
+      const reason = throttled ? `HTTP ${status}` : `meta-refresh ${metaRefresh}s`
+      const retryAfter = typeof response?.headers === "function" ? response.headers()["retry-after"] : undefined
+      const delay = backoffDelay(attempt, retryAfter)
+      console.warn(`[retry] ${url}: looks rate-limited (${reason}); backing off ${delay}ms then retrying (attempt ${attempt + 1}/${maxRetries})`)
+      await page.waitForTimeout(delay)
+      attempt += 1
+      continue
+    }
+
+    return { networkSettled, attempts: attempt + 1, rateLimited }
+  }
+}
+
 async function scanSinglePage(page, url, options) {
   const start = Date.now()
   await disableCache(page)
-  await page.goto(url, { waitUntil: "load", timeout: options.timeout })
 
-  let networkSettled = true
-  await page.waitForLoadState("networkidle", { timeout: Math.min(options.timeout, 7000) })
-    .catch(() => { networkSettled = false })
+  const { networkSettled, attempts, rateLimited } = await navigateWithRetry(page, url, options)
 
   // Allow async rendering (JS frameworks, lazy hydration) to stabilise
   await page.waitForTimeout(STABILIZATION_DELAY_MS)
@@ -161,6 +237,8 @@ async function scanSinglePage(page, url, options) {
     scannedAt: new Date().toISOString(),
     durationMs: Date.now() - start,
     networkSettled,
+    attempts,
+    rateLimited,
     violations,
     passes,
     incomplete,
