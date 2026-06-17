@@ -83,7 +83,11 @@ async function prepareAndLaunch() {
 
   if (mainWindow && !mainWindow.isDestroyed()) {
     await mainWindow.loadURL(`http://127.0.0.1:${port}/`)
-    if (isDev) mainWindow.webContents.openDevTools({ mode: "detach" })
+    // DevTools no longer auto-opens in dev — the in-app Console covers logs now.
+    // Opt in with INCLUDA_DEVTOOLS=1, or open it manually with F12 / the View menu.
+    if (isDev && process.env.INCLUDA_DEVTOOLS === "1") {
+      mainWindow.webContents.openDevTools({ mode: "detach" })
+    }
   }
 }
 
