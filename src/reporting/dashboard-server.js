@@ -152,7 +152,7 @@ export async function serveDashboard({ dataDir, port, defaultOptions = {}, initi
       locale: merged.locale || "en",
       wcagLevel,
       maxPages: Number(merged.maxPages ?? Infinity),
-      concurrency: Number(merged.concurrency ?? 10),
+      concurrency: Math.max(1, Number(merged.concurrency) || 10),
       depth: Number(merged.depth ?? 6),
       sampleTemplates: Number(merged.sampleTemplates ?? 0),
       timeout: Number(merged.timeout ?? 30000),
@@ -309,7 +309,12 @@ export async function serveDashboard({ dataDir, port, defaultOptions = {}, initi
         if (!project) { sendJson(res, 404, { error: "Project not found" }); return }
         try {
           const body = JSON.parse(await readBody(req) || "{}")
-          const updated = await store.update(projectId, { name: body.name, url: body.url })
+          const patch = {}
+          if (body.name !== undefined) patch.name = body.name
+          if (body.url !== undefined) patch.url = body.url
+          // Merge so editing one option (e.g. concurrency) keeps the rest.
+          if (body.options) patch.options = { ...(project.options || {}), ...body.options }
+          const updated = await store.update(projectId, patch)
           sendJson(res, 200, updated)
         } catch (err) { sendJson(res, 400, { error: err.message }) }
         return

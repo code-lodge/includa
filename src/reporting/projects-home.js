@@ -124,6 +124,10 @@ input:focus{border-color:var(--accent)}
       <label for="modal-url">URL</label>
       <input type="url" id="modal-url" placeholder="https://example.com" autocomplete="off">
     </div>
+    <div>
+      <label for="modal-concurrency">Parallel page scans <span style="opacity:.65;font-weight:400">— lower (e.g. 3) if the site rate-limits</span></label>
+      <input type="number" id="modal-concurrency" min="1" max="50" placeholder="10" autocomplete="off">
+    </div>
     <div class="error-msg" id="modal-error"></div>
     <div class="modal-footer">
       <button class="btn btn-ghost" id="cancelModalBtn">Cancel</button>
@@ -144,16 +148,18 @@ function openAddModal() {
   document.getElementById('modal-project-id').value = ''
   document.getElementById('modal-name').value = ''
   document.getElementById('modal-url').value = ''
+  document.getElementById('modal-concurrency').value = ''
   document.getElementById('modal-error').textContent = ''
   document.getElementById('project-modal').classList.add('open')
   document.getElementById('modal-name').focus()
 }
 
-function openEditModal(id, name, url) {
+function openEditModal(id, name, url, concurrency) {
   document.getElementById('modal-title').textContent = 'Edit Project'
   document.getElementById('modal-project-id').value = id
   document.getElementById('modal-name').value = name
   document.getElementById('modal-url').value = url
+  document.getElementById('modal-concurrency').value = concurrency || ''
   document.getElementById('modal-error').textContent = ''
   document.getElementById('project-modal').classList.add('open')
   document.getElementById('modal-name').focus()
@@ -177,18 +183,26 @@ async function saveProject() {
   var id = document.getElementById('modal-project-id').value
   var name = document.getElementById('modal-name').value.trim()
   var url = document.getElementById('modal-url').value.trim()
+  var concurrencyRaw = document.getElementById('modal-concurrency').value.trim()
   var errEl = document.getElementById('modal-error')
 
   if (!name) { errEl.textContent = 'Name is required'; return }
   if (!url) { errEl.textContent = 'URL is required'; return }
   try { new URL(url) } catch(e) { errEl.textContent = 'Enter a valid URL'; return }
 
+  var payload = { name: name, url: url }
+  if (concurrencyRaw) {
+    var concurrency = parseInt(concurrencyRaw, 10)
+    if (!(concurrency >= 1)) { errEl.textContent = 'Parallel page scans must be a whole number of at least 1'; return }
+    payload.options = { concurrency: concurrency }
+  }
+
   errEl.textContent = ''
   try {
     if (id) {
-      await fetch('/api/projects/' + id, { method: 'PATCH', headers: {'content-type':'application/json'}, body: JSON.stringify({ name: name, url: url }) })
+      await fetch('/api/projects/' + id, { method: 'PATCH', headers: {'content-type':'application/json'}, body: JSON.stringify(payload) })
     } else {
-      await fetch('/api/projects', { method: 'POST', headers: {'content-type':'application/json'}, body: JSON.stringify({ name: name, url: url }) })
+      await fetch('/api/projects', { method: 'POST', headers: {'content-type':'application/json'}, body: JSON.stringify(payload) })
     }
     closeModal()
     await refreshProjects()
@@ -209,7 +223,7 @@ document.getElementById('projects-grid').addEventListener('click', function(e) {
   if (action === 'start') { startProject(id) }
   else if (action === 'stop') { stopProject(id) }
   else if (action === 'resume') { resumeProject(id) }
-  else if (action === 'edit') { openEditModal(id, btn.dataset.name || '', btn.dataset.url || '') }
+  else if (action === 'edit') { openEditModal(id, btn.dataset.name || '', btn.dataset.url || '', btn.dataset.concurrency || '') }
   else if (action === 'delete') { deleteProject(id) }
 })
 
@@ -292,7 +306,7 @@ function renderCardHtml(p) {
     errBlock +
     '<div class="card-actions">' +
       startBtn + resumeBtn + dashLink + exportBtn +
-      '<button class="btn btn-sm btn-ghost" data-action="edit" data-id="' + p.id + '" data-name="' + escHtml(p.name) + '" data-url="' + escHtml(p.url) + '">Edit</button>' +
+      '<button class="btn btn-sm btn-ghost" data-action="edit" data-id="' + p.id + '" data-name="' + escHtml(p.name) + '" data-url="' + escHtml(p.url) + '" data-concurrency="' + ((p.options && p.options.concurrency) || '') + '">Edit</button>' +
       '<button class="btn btn-sm btn-ghost btn-delete" data-action="delete" data-id="' + p.id + '">Delete</button>' +
     '</div>' +
   '</div>'
@@ -484,7 +498,7 @@ function renderCardHtml(p) {
   ${errBlock}
   <div class="card-actions">
     ${startBtn}${resumeBtn}${dashLink}${exportBtn}
-    <button class="btn btn-sm btn-ghost" data-action="edit" data-id="${p.id}" data-name="${escHtml(p.name)}" data-url="${escHtml(p.url)}">Edit</button>
+    <button class="btn btn-sm btn-ghost" data-action="edit" data-id="${p.id}" data-name="${escHtml(p.name)}" data-url="${escHtml(p.url)}" data-concurrency="${p.options?.concurrency ?? ""}">Edit</button>
     <button class="btn btn-sm btn-ghost btn-delete" data-action="delete" data-id="${p.id}">Delete</button>
   </div>
 </div>`
