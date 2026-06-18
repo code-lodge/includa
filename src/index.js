@@ -207,6 +207,7 @@ async function executeScan(targetUrl, options, signal, { reportDir, liveTracker 
   const passesRuleAcc = {}
   const templateAcc = {}
   const dedupeMap = new Map()
+  const incompleteDedupeMap = new Map()
   const pagesLite = []
   const pagesByTemplate = {}
 
@@ -286,7 +287,33 @@ async function executeScan(targetUrl, options, signal, { reportDir, liveTracker 
       }
     }
     if (page.incomplete) {
-      for (const item of page.incomplete) severity.totalIncomplete += Math.max(1, item.nodes.length)
+      for (const item of page.incomplete) {
+        severity.totalIncomplete += Math.max(1, item.nodes.length)
+        // Dedupe "needs review" items the same way as violations, kept separate
+        // so the unique-issues report can surface them behind a toggle.
+        for (const node of item.nodes) {
+          const fp = `${item.id}::${normalizeSelector(node.target)}`
+          if (!incompleteDedupeMap.has(fp)) {
+            incompleteDedupeMap.set(fp, {
+              fingerprint: fp, ruleId: item.id, impact: item.impact,
+              help: item.help, helpUrl: item.helpUrl, description: item.description,
+              templates: new Set(), affectedPages: new Set(),
+              occurrences: 0, exampleNode: node,
+              exampleTemplate: template, examplePageUrl: page.url,
+              cms: page.cms || null
+            })
+          }
+          const entry = incompleteDedupeMap.get(fp)
+          entry.occurrences += 1
+          entry.templates.add(template)
+          entry.affectedPages.add(page.url)
+          if (node.screenshotPath && !entry.exampleNode.screenshotPath) {
+            entry.exampleNode = node
+            entry.exampleTemplate = template
+            entry.examplePageUrl = page.url
+          }
+        }
+      }
     }
 
     pagesLite.push({
@@ -333,7 +360,7 @@ async function executeScan(targetUrl, options, signal, { reportDir, liveTracker 
   }
 
   const dedupeItems = Array.from(dedupeMap.values()).map((entry) => ({
-    fingerprint: entry.fingerprint, ruleId: entry.ruleId, impact: entry.impact,
+    fingerprint: entry.fingerprint, ruleId: entry.ruleId, impact: entry.impact, category: "violation",
     help: entry.help, helpUrl: entry.helpUrl, description: entry.description,
     templates: Array.from(entry.templates), affectedPages: Array.from(entry.affectedPages),
     pageCount: entry.affectedPages.size, occurrences: entry.occurrences,
@@ -343,6 +370,18 @@ async function executeScan(targetUrl, options, signal, { reportDir, liveTracker 
   }))
   dedupeItems.sort((a, b) => b.priorityScore - a.priorityScore || b.occurrences - a.occurrences)
   const uniqueViolations = { uniqueViolations: dedupeItems, totalUnique: dedupeItems.length }
+
+  const incompleteItems = Array.from(incompleteDedupeMap.values()).map((entry) => ({
+    fingerprint: entry.fingerprint, ruleId: entry.ruleId, impact: entry.impact || "unknown", category: "incomplete",
+    help: entry.help, helpUrl: entry.helpUrl, description: entry.description,
+    templates: Array.from(entry.templates), affectedPages: Array.from(entry.affectedPages),
+    pageCount: entry.affectedPages.size, occurrences: entry.occurrences,
+    priorityScore: (IMPACT_WEIGHT[entry.impact] ?? 0.5) * entry.occurrences,
+    exampleNode: entry.exampleNode, exampleTemplate: entry.exampleTemplate,
+    examplePageUrl: entry.examplePageUrl, cms: entry.cms,
+  }))
+  incompleteItems.sort((a, b) => b.priorityScore - a.priorityScore || b.occurrences - a.occurrences)
+  const uniqueIncomplete = { uniqueIncomplete: incompleteItems, totalUnique: incompleteItems.length }
 
   const summary = {
     targetUrl,
@@ -389,6 +428,7 @@ async function executeScan(targetUrl, options, signal, { reportDir, liveTracker 
     ruleSummary: { rules: ruleAcc },
     templateSummary: { templates: templateAcc },
     uniqueViolations,
+    uniqueIncomplete,
     scoreSummary,
     logs: logger.logs
   })

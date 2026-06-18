@@ -45,7 +45,7 @@ function renderRows(items, totalPages) {
       : ""
 
     return `
-    <details class="issue impact-${escapeHtml(item.impact)}" data-impact="${escapeHtml(item.impact)}" data-templates="${escapeHtml(item.templates.join(","))}">
+    <details class="issue impact-${escapeHtml(item.impact)}${item.category === "incomplete" ? " review hidden" : ""}" data-impact="${escapeHtml(item.impact)}" data-category="${item.category === "incomplete" ? "incomplete" : "violation"}" data-templates="${escapeHtml(item.templates.join(","))}">
       <summary class="issue-summary">
         <span class="rank">#${idx + 1}</span>
         <span class="rule-info">
@@ -53,6 +53,7 @@ function renderRows(items, totalPages) {
           <span class="rule-help">${escapeHtml(item.help)}</span>
         </span>
         <span class="issue-meta">
+          ${item.category === "incomplete" ? `<span class="badge badge-review" title="axe could not verify this automatically — needs manual review">review</span>` : ""}
           ${badge(item.impact)}
           <span class="stat-pill" title="${item.pageCount} pages affected">${item.pageCount} pages</span>
           <span class="stat-pill muted-pill" title="${item.occurrences} total occurrences">${item.occurrences}×</span>
@@ -93,9 +94,10 @@ function groupedByTemplate(items) {
   return groups
 }
 
-export async function writeUniqueIssuesReport(reportDir, uniqueViolationsData, totalPages) {
+export async function writeUniqueIssuesReport(reportDir, uniqueViolationsData, totalPages, uniqueIncompleteData) {
   const { uniqueViolations } = uniqueViolationsData
-  if (!uniqueViolations || uniqueViolations.length === 0) return
+  const incompleteItems = uniqueIncompleteData?.uniqueIncomplete || []
+  if ((!uniqueViolations || uniqueViolations.length === 0) && incompleteItems.length === 0) return
 
   const impactCounts = {}
   for (const item of uniqueViolations) {
@@ -151,7 +153,7 @@ export async function writeUniqueIssuesReport(reportDir, uniqueViolationsData, t
     `<option value="${escapeHtml(t)}">${escapeHtml(t)}</option>`
   ).join("\n            ")
 
-  const allRows = renderRows(uniqueViolations, totalPages)
+  const allRows = renderRows([...uniqueViolations, ...incompleteItems], totalPages)
 
   const topIssues = [...uniqueViolations]
     .sort((a, b) => (IMPACT_ORDER[a.impact] ?? 4) - (IMPACT_ORDER[b.impact] ?? 4) || b.pageCount - a.pageCount)
@@ -384,6 +386,15 @@ export async function writeUniqueIssuesReport(reportDir, uniqueViolationsData, t
     .badge-moderate { background: rgba(250, 204, 21, 0.18);  color: #fde68a; }
     .badge-minor    { background: rgba(96, 165, 250, 0.2);   color: #93c5fd; }
     .badge-unknown  { background: rgba(156, 163, 175, 0.2);  color: #d1d5db; }
+    .badge-review   { background: rgba(168, 139, 250, 0.22); color: #c4b5fd; }
+    .issue.review { border-left-color: #a78bfa; border-left-style: dashed; }
+    .review-toggle {
+      display: inline-flex; align-items: center; gap: 0.4rem;
+      font-size: 0.78rem; color: var(--muted); cursor: pointer;
+      padding: 0.28rem 0.7rem; border: 1px solid var(--stroke); border-radius: 999px;
+    }
+    .review-toggle:hover { border-color: var(--accent-2); color: var(--text); }
+    .review-toggle input { accent-color: var(--accent); margin: 0; }
 
     a { color: var(--accent-2); }
     a:visited { color: #a78bfa; }
@@ -482,6 +493,11 @@ export async function writeUniqueIssuesReport(reportDir, uniqueViolationsData, t
         <div class="stat-card-label">Pages Scanned</div>
         <div class="stat-card-value">${totalPages}</div>
       </div>
+      ${incompleteItems.length ? `
+      <div class="stat-card">
+        <div class="stat-card-label">Needs Review</div>
+        <div class="stat-card-value" style="color:#c4b5fd">${incompleteItems.length}</div>
+      </div>` : ""}
       ${Object.entries(impactCounts)
         .sort(([a], [b]) => (IMPACT_ORDER[a] ?? 4) - (IMPACT_ORDER[b] ?? 4))
         .map(([impact, count]) => `
@@ -499,6 +515,12 @@ export async function writeUniqueIssuesReport(reportDir, uniqueViolationsData, t
       <div class="filter-group" id="templateFilters">
         ${templateFilterHtml}
       </div>
+      ${incompleteItems.length ? `
+      <div class="filter-separator"></div>
+      <label class="review-toggle" title="Items axe-core could not verify automatically — review and decide which to fix">
+        <input type="checkbox" id="reviewToggle" />
+        Show items needing review <span class="filter-count">${incompleteItems.length}</span>
+      </label>` : ""}
     </div>
 
     <input class="search-bar" type="search" id="searchBar" placeholder="Filter by rule ID or description…" aria-label="Search unique issues" />
@@ -527,6 +549,7 @@ export async function writeUniqueIssuesReport(reportDir, uniqueViolationsData, t
     let activeImpact = 'all'
     let activeTemplate = 'all'
     let searchQuery = ''
+    let showReview = false
 
     function applyFilters() {
       const items = document.querySelectorAll('#issueList details')
@@ -535,16 +558,18 @@ export async function writeUniqueIssuesReport(reportDir, uniqueViolationsData, t
         const impact = item.dataset.impact || ''
         const templates = (item.dataset.templates || '').split(',')
         const text = item.textContent.toLowerCase()
+        const isReview = item.dataset.category === 'incomplete'
 
         const impactOk = activeImpact === 'all' || impact === activeImpact
         const templateOk = activeTemplate === 'all' || templates.includes(activeTemplate)
         const searchOk = searchQuery === '' || text.includes(searchQuery)
+        const reviewOk = !isReview || showReview
 
-        const show = impactOk && templateOk && searchOk
+        const show = impactOk && templateOk && searchOk && reviewOk
         item.classList.toggle('hidden', !show)
         if (show) visible++
       }
-      document.getElementById('resultsCount').textContent = visible + ' unique issue' + (visible !== 1 ? 's' : '')
+      document.getElementById('resultsCount').textContent = visible + ' issue' + (visible !== 1 ? 's' : '') + (showReview ? ' (incl. needs-review)' : '')
     }
 
     document.getElementById('impactFilters').addEventListener('click', (e) => {
@@ -568,9 +593,16 @@ export async function writeUniqueIssuesReport(reportDir, uniqueViolationsData, t
       applyFilters()
     })
 
+    const reviewToggle = document.getElementById('reviewToggle')
+    if (reviewToggle) reviewToggle.addEventListener('change', (e) => {
+      showReview = e.target.checked
+      applyFilters()
+    })
+
     // Set initial active state on "all" buttons
     document.querySelector('[data-filter-impact="all"]')?.classList.add('active')
     document.querySelector('[data-filter-template="all"]')?.classList.add('active')
+    applyFilters()
 
     // AI prompt builder
     var PROMPT_DATA = ${promptData};

@@ -18,6 +18,6 @@ export async function generateReports(payload) {
     await writeRuleReports(payload.reportDir, payload.ruleSummary)
     await writeTemplateReports(payload.reportDir, payload.templateSummary, payload.pagesByTemplate)
     await writeStaticReport(payload.reportDir, payload)
-    await writeUniqueIssuesReport(payload.reportDir, payload.uniqueViolations, payload.pagesLite.length)
+    await writeUniqueIssuesReport(payload.reportDir, payload.uniqueViolations, payload.pagesLite.length, payload.uniqueIncomplete)
   }
 }
