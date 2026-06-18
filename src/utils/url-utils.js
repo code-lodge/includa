@@ -70,6 +70,27 @@ export function isExcluded(url, excludePatterns) {
   return excludePatterns.some((pattern) => isPatternMatch(url, pattern))
 }
 
+// Endpoints that aren't HTML pages and so shouldn't be accessibility-scanned.
+// Excluded from discovery by default (in addition to any user --exclude rules).
+// Matched against the lower-cased URL pathname.
+const NON_HTML_ENDPOINT_PATTERNS = [
+  /\.json$/, // *.json (data / API responses)
+  /\.md$/, // *.md (e.g. /agents.md and other markdown docs)
+  /^\/\.well-known\//, // /.well-known/* (security.txt, etc.)
+  /^\/robots\.txt$/, // robots.txt
+  /^\/api\/ucp\// // /api/ucp/* (non-HTML API)
+]
+
+export function isNonHtmlEndpoint(url) {
+  let pathname
+  try {
+    pathname = new URL(url).pathname.toLowerCase()
+  } catch {
+    return false
+  }
+  return NON_HTML_ENDPOINT_PATTERNS.some((re) => re.test(pathname))
+}
+
 export function getPathDepth(url, basePathname = "/") {
   const pathname = new URL(url).pathname
   const relative = pathname.startsWith(basePathname) ? pathname.slice(basePathname.length) : pathname

@@ -6,6 +6,7 @@ import {
   getPathDepth,
   isExcluded,
   isIncluded,
+  isNonHtmlEndpoint,
   isSameDomain,
   normalizeUrl
 } from "../utils/url-utils.js"
@@ -15,6 +16,7 @@ function shouldKeep(url, options, robotsRules, baseUrl) {
   if (!isAllowedByRobots(url, robotsRules)) return false
   if (!isIncluded(url, options.include)) return false
   if (isExcluded(url, options.exclude)) return false
+  if (isNonHtmlEndpoint(url)) return false
 
   const basePath = new URL(baseUrl).pathname
   if (getPathDepth(url, basePath) > options.depth) return false
