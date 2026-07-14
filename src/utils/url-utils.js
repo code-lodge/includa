@@ -72,12 +72,19 @@ export function isExcluded(url, excludePatterns) {
 
 // Endpoints that aren't HTML pages and so shouldn't be accessibility-scanned.
 // Excluded from discovery by default (in addition to any user --exclude rules).
-// Matched against the lower-cased URL pathname.
+// Matched against the lower-cased URL pathname. This is only the fast path —
+// the scanner also checks the response Content-Type, which catches non-HTML
+// endpoints that have no telltale extension.
 const NON_HTML_ENDPOINT_PATTERNS = [
-  /\.json$/, // *.json (data / API responses)
-  /\.md$/, // *.md (e.g. /agents.md and other markdown docs)
+  // Data / text documents (markdown like /agents.md, feeds, llms.txt, ...)
+  /\.(?:json|jsonld|md|markdown|txt|xml|rss|atom|csv|tsv|ya?ml|pdf)$/,
+  // Code, styles, sourcemaps
+  /\.(?:js|mjs|cjs|css|map|wasm)$/,
+  // Images, fonts, media
+  /\.(?:png|jpe?g|gif|webp|avif|svg|ico|bmp|tiff?|heic|woff2?|ttf|otf|eot|mp3|mp4|m4a|m4v|webm|ogg|ogv|wav|avi|mov|mkv)$/,
+  // Archives, installers, office documents
+  /\.(?:zip|gz|tgz|bz2|rar|7z|dmg|exe|msi|apk|deb|rpm|docx?|xlsx?|pptx?|odt|ods|odp)$/,
   /^\/\.well-known\//, // /.well-known/* (security.txt, etc.)
-  /^\/robots\.txt$/, // robots.txt
   /^\/api\/ucp\// // /api/ucp/* (non-HTML API)
 ]
 

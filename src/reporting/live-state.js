@@ -28,6 +28,7 @@ async function writePageDetail(reportDir, pageResult, template) {
     cms: pageResult.cms ?? null,
     checks: pageResult.checks,
     error: pageResult.error,
+    skipReason: pageResult.skipReason,
     rulesRun: pageResult.rulesRun || [],
     passes: pageResult.passes || [],
     violations: pageResult.violations.map((violation) => ({

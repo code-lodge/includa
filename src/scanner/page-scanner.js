@@ -153,6 +153,16 @@ async function inspectInterstitial(page) {
   }).catch(() => ({ metaRefresh: null, textLength: 0 }))
 }
 
+// Only HTML documents should be axe-scanned. Anything else (markdown, JSON,
+// plain text, XML feeds, ...) is rendered by Chromium inside a bare viewer shim
+// that has no <title> or lang attribute, so axe reports false violations on
+// content that isn't a real page. A missing Content-Type is given the benefit
+// of the doubt — Chromium sniffed it as navigable, and HTML is the common case.
+function isHtmlContentType(contentType) {
+  const mime = String(contentType || "").split(";")[0].trim().toLowerCase()
+  return mime === "" || mime === "text/html" || mime === "application/xhtml+xml"
+}
+
 // Navigate to `url`, retrying with backoff while the response looks rate-limited
 // — a throttling status, or a meta-refresh interstitial (a near-empty "please
 // wait" shim). Retrying lets a transient rate limit clear so we scan the real
@@ -171,6 +181,11 @@ async function navigateWithRetry(page, url, options) {
     try {
       response = await page.goto(url, { waitUntil: "load", timeout: options.timeout })
     } catch (err) {
+      // Navigating to a binary/attachment endpoint makes Chromium start a
+      // download instead of rendering a page — not scannable, don't retry.
+      if (/download is starting/i.test(String(err.message))) {
+        return { networkSettled: true, attempts: attempt + 1, rateLimited: false, reason: "", contentType: "file download" }
+      }
       // A failed navigation is itself a common throttling symptom — retry it too.
       if (attempt < maxRetries) {
         const delay = backoffDelay(attempt)
@@ -201,7 +216,8 @@ async function navigateWithRetry(page, url, options) {
       continue
     }
 
-    return { networkSettled, attempts: attempt + 1, rateLimited, reason }
+    const contentType = typeof response?.headers === "function" ? (response.headers()["content-type"] || "") : ""
+    return { networkSettled, attempts: attempt + 1, rateLimited, reason, contentType }
   }
 }
 
@@ -209,7 +225,7 @@ async function scanSinglePage(page, url, options) {
   const start = Date.now()
   await disableCache(page)
 
-  const { networkSettled, attempts, rateLimited, reason } = await navigateWithRetry(page, url, options)
+  const { networkSettled, attempts, rateLimited, reason, contentType } = await navigateWithRetry(page, url, options)
 
   // Still a rate-limit interstitial after every retry — don't scan the "please
   // wait" shim (its meta-refresh would be a false-positive critical). Fail the
@@ -218,6 +234,31 @@ async function scanSinglePage(page, url, options) {
   if (rateLimited) {
     console.warn(`[rate-limited] ${url}: gave up after ${attempts} attempts (${reason})`)
     throw new Error(`Rate-limited: still a refresh interstitial after ${attempts} attempts (${reason}). Lower --concurrency and rescan.`)
+  }
+
+  // Not an HTML document (markdown, JSON, plain text, ...) — Chromium renders
+  // these in a bare viewer shim, so axe results would be false positives.
+  // Report the page as skipped; the aggregation step excludes it entirely.
+  if (!isHtmlContentType(contentType)) {
+    console.warn(`[skipped] ${url}: not an HTML page (${contentType}) — excluded from the report`)
+    return {
+      url,
+      title: "",
+      template: detectTemplate(url),
+      status: "skipped",
+      skipReason: `Not an HTML page (${contentType})`,
+      scannedAt: new Date().toISOString(),
+      durationMs: Date.now() - start,
+      networkSettled,
+      attempts,
+      rateLimited: false,
+      violations: [],
+      passes: [],
+      incomplete: [],
+      inapplicable: [],
+      rulesRun: [],
+      checks: {}
+    }
   }
 
   // Allow async rendering (JS frameworks, lazy hydration) to stabilise

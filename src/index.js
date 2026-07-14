@@ -210,8 +210,17 @@ async function executeScan(targetUrl, options, signal, { reportDir, liveTracker 
   const incompleteDedupeMap = new Map()
   const pagesLite = []
   const pagesByTemplate = {}
+  let skippedPages = 0
 
   for await (const page of streamJsonl(resumeResultsPath(reportDir))) {
+    // Non-HTML endpoints (markdown, JSON, plain text, ...) are recorded as
+    // "skipped" by the scanner — they aren't real pages, so they are excluded
+    // from every report metric (score, templates, page lists).
+    if (page.status === "skipped") {
+      skippedPages += 1
+      continue
+    }
+
     const template = page.template || page.cms?.templateFile || detectTemplate(page.url)
 
     if (!templateAcc[template]) {
@@ -383,9 +392,14 @@ async function executeScan(targetUrl, options, signal, { reportDir, liveTracker 
   incompleteItems.sort((a, b) => b.priorityScore - a.priorityScore || b.occurrences - a.occurrences)
   const uniqueIncomplete = { uniqueIncomplete: incompleteItems, totalUnique: incompleteItems.length }
 
+  if (skippedPages > 0) {
+    logger.info(`Excluded ${skippedPages} non-HTML endpoint${skippedPages === 1 ? "" : "s"} from the report`)
+  }
+
   const summary = {
     targetUrl,
     scannedPages: pagesLite.length,
+    skippedPages,
     totalViolations: severity.totalViolations,
     totalRulesTriggered: Object.keys(ruleAcc).length,
     startedAt: logger.startedAt,

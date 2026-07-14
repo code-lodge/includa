@@ -1025,9 +1025,11 @@ const DASHBOARD_HTML = `<!doctype html>
     function statusBadge(p) {
       return p.status === 'error'
         ? '<span class="badge badge-critical">error</span>'
-        : (p.violations || 0) > 0
-          ? '<span class="badge badge-serious">' + (p.violations || 0) + ' violations</span>'
-          : '<span class="badge" style="background:rgba(34,197,94,0.2);color:#86efac">clean</span>'
+        : p.status === 'skipped'
+          ? '<span class="badge" style="background:rgba(148,163,184,0.15);color:#94a3b8" title="Not an HTML page — excluded from the report">skipped</span>'
+          : (p.violations || 0) > 0
+            ? '<span class="badge badge-serious">' + (p.violations || 0) + ' violations</span>'
+            : '<span class="badge" style="background:rgba(34,197,94,0.2);color:#86efac">clean</span>'
     }
 
     // --- page details panel ---

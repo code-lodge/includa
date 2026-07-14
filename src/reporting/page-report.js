@@ -251,6 +251,8 @@ function renderPageHtml(page) {
 
 export async function writePageReports(reportDir, jsonlPath) {
   for await (const page of streamJsonl(jsonlPath)) {
+    // Non-HTML endpoints are excluded from the report — no page detail either.
+    if (page.status === "skipped") continue
     const template = page.template || page.cms?.templateFile || detectTemplate(page.url)
     const folder = templateFolder(template)
     const outputDir = path.join(reportDir, "pages", folder)
