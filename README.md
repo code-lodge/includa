@@ -34,7 +34,7 @@ A scan of a typical mid-size storefront produces hundreds of raw violations. Inc
 
 ## Features
 
-- 🌐 **Whole-site crawl** — discovers URLs from `sitemap.xml`, sitemap indexes, `robots.txt`, and BFS link traversal with configurable depth
+- 🌐 **Whole-site crawl** — discovers URLs from `sitemap.xml`, sitemap indexes, `robots.txt`, and, when a site has no sitemap, a link crawl that follows every same-host link (hash-routed single-page apps are crawled route by route) up to a configurable depth
 - ♿ **WCAG 2.0 / 2.1 / 2.2** — Levels A, AA, and AAA via `@axe-core/playwright`, with binary compliance results plus a Lighthouse-style 0–100 quality score
 - 🔍 **Smart deduplication** — collapses identical patterns across pages so the same broken footer link counts once, not 1,200 times
 - 🧠 **CMS-aware** — detects WordPress (Block + Classic), Shopify (incl. PageFly), Drupal, Magento 2, Squarespace, HubSpot, Ghost — and tailors fix prompts to each platform

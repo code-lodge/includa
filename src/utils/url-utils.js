@@ -8,9 +8,37 @@ const TRACKING_PARAMS = new Set([
   "fbclid"
 ])
 
+/**
+ * Hash fragments that act as client-side routes ("#/about", "#!/about") name
+ * distinct pages in a hash-routed single-page app, so they survive
+ * normalization. Plain in-page anchors ("#top", "#section-2") are dropped.
+ * Returns the normalized route fragment, or "" when the hash is not a route.
+ */
+function routeFragment(hash) {
+  if (!hash || hash.length < 2) return ""
+  const bang = hash.startsWith("#!")
+  const body = hash.slice(bang ? 2 : 1)
+  if (!body.startsWith("/")) return ""
+
+  let route = body.replace(/\/{2,}/g, "/")
+  if (route.length > 1) route = route.replace(/\/$/, "")
+  if (route === "/") return "" // "#/" is the app's root — same page as no hash
+
+  return `#${bang ? "!" : ""}${route}`
+}
+
+export function isHashRoute(url) {
+  try {
+    return routeFragment(new URL(url).hash) !== ""
+  } catch {
+    return false
+  }
+}
+
 export function normalizeUrl(input, baseUrl) {
   try {
     const url = baseUrl ? new URL(input, baseUrl) : new URL(input)
+    const route = routeFragment(url.hash)
     url.hash = ""
 
     if ((url.protocol === "https:" && url.port === "443") || (url.protocol === "http:" && url.port === "80")) {
@@ -29,6 +57,7 @@ export function normalizeUrl(input, baseUrl) {
     }
 
     url.search = nextParams.toString() ? `?${nextParams.toString()}` : ""
+    url.hash = route
     return url.href
   } catch {
     return null

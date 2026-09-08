@@ -7,7 +7,7 @@
 3. URL discovery order:
    - robots/sitemap detection
    - sitemap index recursion
-   - BFS Playwright crawling fallback
+   - BFS Playwright link crawl when no sitemap yields URLs (same host only; `#/route` hash routes count as pages)
 4. Scanner uses a browser pool (`src/scanner/browser-pool.js`) and per-page axe checks (`src/scanner/axe-runner.js`)
 5. Analysis modules group by severity, WCAG tags, rules, and templates
 6. Reporting writes raw + summarized machine files and human HTML dashboards
