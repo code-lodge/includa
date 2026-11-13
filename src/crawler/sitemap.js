@@ -1,9 +1,41 @@
 import { parseStringPromise } from "xml2js"
 import { gunzipSync } from "node:zlib"
+import { setTimeout as sleep } from "node:timers/promises"
 import { normalizeUrl, fetchWithTimeout } from "../utils/url-utils.js"
+import { THROTTLE_STATUSES, DEFAULT_MAX_RETRIES, backoffDelay } from "../utils/retry.js"
 
-async function readXml(url) {
-  const response = await fetchWithTimeout(url, 15000)
+const SITEMAP_TIMEOUT_MS = 15000
+
+// Fetch a sitemap, backing off and retrying while the origin throttles us or
+// the request fails outright. Scanning several sites on one host at once (e.g.
+// a shop's language domains) easily trips its rate limit, and giving up on the
+// first 429 silently dropped every URL in that child sitemap from the scan.
+async function fetchSitemap(url, logger) {
+  for (let attempt = 0; ; attempt += 1) {
+    const canRetry = attempt < DEFAULT_MAX_RETRIES
+
+    let response
+    try {
+      response = await fetchWithTimeout(url, SITEMAP_TIMEOUT_MS)
+    } catch (error) {
+      if (!canRetry) throw error
+      const delay = backoffDelay(attempt)
+      logger.warn(`Sitemap ${url} — ${error.message}; retrying in ${delay}ms (attempt ${attempt + 1}/${DEFAULT_MAX_RETRIES})`)
+      await sleep(delay)
+      continue
+    }
+
+    if (!THROTTLE_STATUSES.has(response.status) || !canRetry) return response
+
+    const delay = backoffDelay(attempt, response.headers.get("retry-after"))
+    await response.body?.cancel().catch(() => {})
+    logger.warn(`Sitemap ${url} — HTTP ${response.status}; retrying in ${delay}ms (attempt ${attempt + 1}/${DEFAULT_MAX_RETRIES})`)
+    await sleep(delay)
+  }
+}
+
+async function readXml(url, logger) {
+  const response = await fetchSitemap(url, logger)
   if (!response.ok) throw new Error(`HTTP ${response.status}`)
   const buffer = Buffer.from(await response.arrayBuffer())
 
@@ -47,7 +79,7 @@ export async function discoverUrlsFromSitemaps(baseUrl, explicitSitemap, robotsR
     visitedSitemaps.add(sitemapUrl)
 
     try {
-      const xml = await readXml(sitemapUrl)
+      const xml = await readXml(sitemapUrl, logger)
 
       if (xml.sitemapindex?.sitemap) {
         const nested = xml.sitemapindex.sitemap

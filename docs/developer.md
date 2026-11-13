@@ -6,7 +6,7 @@
 2. `runScan()` (`src/index.js`) orchestrates discovery, scanning, analysis, and reporting
 3. URL discovery order:
    - robots/sitemap detection
-   - sitemap index recursion
+   - sitemap index recursion (each sitemap fetch backs off and retries on 429/430/503, timeouts and network errors before it is skipped, using the same backoff as the page scanner in `src/utils/retry.js`)
    - BFS Playwright link crawl when no sitemap yields URLs (same host only; `#/route` hash routes count as pages)
 4. Scanner uses a browser pool (`src/scanner/browser-pool.js`) and per-page axe checks (`src/scanner/axe-runner.js`)
 5. Analysis modules group by severity, WCAG tags, rules, and templates

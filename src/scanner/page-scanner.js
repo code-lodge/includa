@@ -3,6 +3,7 @@ import path from "node:path"
 import { runAxe } from "./axe-runner.js"
 import { BrowserPool } from "./browser-pool.js"
 import { safeSlug, detectTemplate } from "../utils/url-utils.js"
+import { THROTTLE_STATUSES, DEFAULT_MAX_RETRIES, backoffDelay } from "../utils/retry.js"
 import { detectCms, cmsSignalScript } from "../analysis/cms/index.js"
 
 async function runKeyboardCheck(page) {
@@ -116,28 +117,10 @@ async function disableCache(page) {
 
 const STABILIZATION_DELAY_MS = 500
 
-// HTTP statuses that signal the origin is throttling us: 429 Too Many Requests,
-// 430 (Shopify's request-throttle code), 503 Service Unavailable.
-const THROTTLE_STATUSES = new Set([429, 430, 503])
-const RETRY_BASE_MS = 1000
-const RETRY_MAX_MS = 20000
-const RETRY_AFTER_CAP_MS = 60000
-const DEFAULT_MAX_RETRIES = 5
 // A rate-limit "please wait" interstitial is a near-empty shim. We treat a page
 // as an interstitial only if it has a meta-refresh AND very little visible text,
 // so real content pages with a (legitimate) meta-refresh are still reported.
 const INTERSTITIAL_MAX_TEXT = 2000
-
-// How long to wait before the next attempt. Honour a Retry-After header when the
-// origin sends one (capped), otherwise exponential backoff with a little jitter
-// so concurrent workers don't all retry in lockstep.
-function backoffDelay(attempt, retryAfterHeader) {
-  const retryAfter = Number(retryAfterHeader)
-  if (Number.isFinite(retryAfter) && retryAfter > 0) {
-    return Math.min(retryAfter * 1000, RETRY_AFTER_CAP_MS)
-  }
-  return Math.min(RETRY_BASE_MS * 2 ** attempt, RETRY_MAX_MS) + Math.floor(Math.random() * 500)
-}
 
 // Inspect the loaded page for the rate-limit interstitial signature: a
 // meta-refresh on a near-empty "please wait" page. Returns the refresh delay in
